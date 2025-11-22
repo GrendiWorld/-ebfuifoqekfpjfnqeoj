@@ -172,7 +172,7 @@ client.set_event_callback(
                 255,
                 150,
                 string.format(
-                    "[resolver] Hit %s in %s for %d damage (%d%% hc) — resolved %s",
+                    "[resolver] Hit %s in %s for %d damage (%d%% hc) â€” resolved %s",
                     name,
                     hg,
                     dmg,
@@ -210,7 +210,7 @@ client.set_event_callback(
                 255,
                 100,
                 100,
-                string.format("[resolver] Missed %s's %s due to %s — resolved %s", name, hg, reason, res:upper())
+                string.format("[resolver] Missed %s's %s due to %s â€” resolved %s", name, hg, reason, res:upper())
             )
         else
             client.color_log(255, 150, 150, string.format("[resolver] Missed %s's %s due to %s", name, hg, reason))
