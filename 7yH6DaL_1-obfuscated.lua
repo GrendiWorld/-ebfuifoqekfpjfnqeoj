@@ -140,7 +140,7 @@ client.set_event_callback(
     end
 )
 
-local hitlog_ref = ui.new_checkbox("LUA", "B", "Resolver Hitlogs")
+local hitlog_ref = ui.new_checkbox("LUA", "B", "Hitlogs")
 
 local hitgroup_names = {
     [0] = "generic",
