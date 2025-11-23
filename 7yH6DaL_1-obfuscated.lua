@@ -1,5 +1,4 @@
 local entity = require "gamesense/entity"
-local ui = require "pui"
 local bit = require "bit"
 
 local enable = ui.checkbox("LUA", "A", "Anti-Aim Correction")
