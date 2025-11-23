@@ -3,7 +3,7 @@ local ui = require "pui"
 local bit = require "bit"
 
 local enable = ui.checkbox("LUA", "A", "Anti-Aim Correction")
-local hitlogs = ui.checkbox("LUA", "A", "Hitlogs")
+
 
 local sides = {}
 local default_rates = {left = 0.6875, right = -0.6875, low_left = 0.34375, center = 0.0}
@@ -155,7 +155,7 @@ local hitgroup_names = {
     [9] = "gear"
 }
 
--- Твоя resolved_side (глобал)
+
 
 client.set_event_callback(
     "aim_hit",
