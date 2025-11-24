@@ -1,4 +1,5 @@
 local entity = require "gamesense/entity"
+local bit = require "pui"
 local bit = require "bit"
 
 
