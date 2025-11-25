@@ -1,5 +1,4 @@
 local entity = require "gamesense/entity"
-local ui = require "gamesense/pui"
 local bit = require "bit"
 
 
@@ -765,7 +764,7 @@ client.set_event_callback("shutdown", function()
 	database.write("sapphyrus_watermark", db)
 end)
 
-
+local pui = require "pui"
 
 client.set_event_callback("paint", HellpineC.ClanTag.run)
 client.color_log(0, 255, 150, "[resolver] I fuck hvh")
