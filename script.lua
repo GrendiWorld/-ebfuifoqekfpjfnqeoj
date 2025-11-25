@@ -1,138 +1,160 @@
-local enable = ui.new_checkbox("Lua", "A", "Anti-Aim correction")
+local resolver_enabled = ui.new_checkbox("LUA", "A", "Anti-Aim Correction")
 
-local storage = {}  
-local last_choked = {}
+local player_states = {}
+local lagged_states = {}
+local resolvers = {}
+local last_simtime = {}
 
-local function norm_yaw(y) 
-    while y > 180 do y = y - 360 end
-    while y <= -180 do y = y + 360 end
-    return y
+local resolver = {}
+resolver.__index = resolver
+
+function resolver:new()
+    return setmetatable({
+        player = nil,
+        player_record = nil,
+        prev_record = nil,
+        side = false,
+        fake = false,
+        was_first_bruteforce = false,
+        was_second_bruteforce = false,
+        original_goal_feet_yaw = 0,
+        original_pitch = 0
+    }, resolver)
 end
 
-local function norm_pitch(p) 
-    p = math.max(-89, math.min(89, p))
-    return p
+function resolver:initialize(e, record, previous_record)
+    self.player = e
+    self.player_record = record
+    if previous_record then
+        self.prev_record = previous_record
+    end
+    local pitch = e:get_prop_vector("m_angEyeAngles").x
+    self.original_pitch = pitch > 89 and pitch - 180 or pitch < -89 and pitch + 180 or pitch
+    self.original_goal_feet_yaw = record.goal_feet_yaw
 end
 
-local function angle_diff(a1, a2)
-    local d = a2 - a1
-    while d > 180 do d = d - 360 end
-    while d <= -180 do d = d + 360 end
-    return d
-end
-
-local function is_adjusting_balance(player)
+function resolver:IsAdjustingBalance()
     for i = 0, 12 do
-        local seq = entity.get_prop(player, "m_AnimOverlay", i, "m_nSequence") or 0
-        if seq == 979 then
+        local seq = self.player_record.layers[i].sequence or 0
+        if entity.get_sequence_activity(seq) == 979 then
             return true
         end
     end
     return false
 end
 
-local function is_breaking_lby(player, cur, prev)
-    if not is_adjusting_balance(player) then return false end
-
-    if prev and cur then
+function resolver:is_breaking_lby()
+    if not self.prev_record then return false end
+    local cur = self.player_record.layers[6]
+    local prev = self.prev_record.layers[6]
+    if not cur or not prev then return false end
+    if self:IsAdjustingBalance() then
         if prev.cycle ~= cur.cycle and cur.weight == 1.0 then
             return true
-        end
-        if cur.weight == 0.0 and prev.cycle > 0.92 and cur.cycle > 0.92 then
+        elseif cur.weight == 0.0 and prev.cycle > 0.92 and cur.cycle > 0.92 then
             return true
         end
     end
     return false
 end
 
-local function get_choked(player)
-    local sim = entity.get_prop(player, "m_flSimulationTime") or 0
-    local old = entity.get_prop(player, "m_flOldSimulationTime") or sim
-    local ticks = math.floor((sim - old) / globals.tickinterval() + 0.5)
+function resolver:get_side_standing()
+    local eye_yaw = self.player:get_prop_vector("m_angEyeAngles").y
+    local diff = eye_yaw - self.original_goal_feet_yaw
+    while diff > 180 do diff = diff - 360 end
+    while diff <= -180 do diff = diff + 360 end
+    self.side = diff <= 0
+end
 
-    local idx = entity.get_prop(player, "m_nTickBase")
-    if ticks == 0 and last_choked[idx] and last_choked[idx] > 0 then
-        return last_choked[idx] - 1
+function resolver:resolve()
+    self:get_side_standing()
+    if self:is_breaking_lby() then
+        self.player:set_prop_float("m_flPoseParameter", 0, self.side and 1.0 or 0.0)
+        self.was_first_bruteforce = false
+        self.was_second_bruteforce = false
+    else
+        if not self.was_first_bruteforce then
+            self.player:set_prop_float("m_flPoseParameter", 0, 1.0)
+            self.was_first_bruteforce = true
+            self.was_second_bruteforce = false
+        elseif not self.was_second_bruteforce then
+            self.player:set_prop_float("m_flPoseParameter", 0, 0.0)
+            self.was_second_bruteforce = true
+        else
+            self.player:set_prop_float("m_flPoseParameter", 0, self.side and 1.0 or 0.0)
+        end
+    end
+end
+
+local function manual_lagcomp(player)
+    local idx = player:get_index()
+    local simtime = player:get_prop_float("m_flSimulationTime")
+    if last_simtime[idx] == simtime then return end
+    last_simtime[idx] = simtime
+
+    player_states[idx] = {
+        origin = player:get_prop_vector("m_vecOrigin"),
+        velocity = player:get_prop_vector("m_vecVelocity"),
+        layers = {}
+    }
+    for i = 0, 12 do
+        player_states[idx].layers[i] = player:get_animlayer(i) or {}
     end
 
-    last_choked[idx] = ticks
-    return ticks
+    local origin = player:get_prop_vector("m_vecOrigin")
+    local velocity = player:get_prop_vector("m_vecVelocity")
+    local ticks = client.latency() / globals.tickinterval()
+    origin = origin + velocity * ticks
+    player:set_prop_vector("m_vecOrigin", origin)
+
+    lagged_states[idx] = {
+        layers = {},
+        goal_feet_yaw = player:get_prop_float("m_flLowerBodyYawTarget")
+    }
+    for i = 0, 12 do
+        lagged_states[idx].layers[i] = player:get_animlayer(i) or {}
+    end
 end
 
-local function get_backward_yaw(player)
-    local lp = entity.get_local_player()
-    if not lp then return 0 end
-    local lorg = vector(entity.get_prop(lp, "m_vecOrigin"))
-    local eorg = vector(entity.get_prop(player, "m_vecOrigin"))
-    local delta = eorg - lorg
-    return math.deg(math.atan2(delta.y, delta.x))
-end
-
-local function run()
-    if not ui.get(enable) then
-        storage = {}
+client.set_event_callback("create_move", function(cmd)
+    if not ui.get(resolver_enabled) then
+        player_states = {}
+        lagged_states = {}
+        resolvers = {}
+        last_simtime = {}
         return
     end
 
-    local me = entity.get_local_player()
-    if not me or not entity.is_alive(me) then return end
-
     local enemies = entity.get_players(true)
-
     for i = 1, #enemies do
-        local p = enemies[i]
-        local idx = p
+        local pl = enemies[i]
+        if pl:is_dormant() or not pl:is_alive() then goto continue end
+        local idx = pl:get_index()
 
-        if not storage[idx] then
-            storage[idx] = {
-                side = false,
-                was_first_brute = false,
-                was_second_brute = false,
-                prev_layers = {}
-            }
-        end
+        manual_lagcomp(pl)
 
-        local data = storage[idx]
-
-        local eye = { entity.get_prop(p, "m_angEyeAngles") }
-        if #eye < 3 then goto next end
-
-        local lby = entity.get_prop(p, "m_flLowerBodyYawTarget") or eye[2]
-        local original_goal_feet_yaw = norm_yaw(lby)
-        local original_pitch = norm_pitch(eye[1])
-
-        local layer12 = {
-            weight = entity.get_prop(p, "m_AnimOverlay", 12, "m_flWeight") or 0,
-            cycle  = entity.get_prop(p, "m_AnimOverlay", 12, "m_flCycle") or 0
+        local current_record = {
+            layers = lagged_states[idx].layers,
+            goal_feet_yaw = lagged_states[idx].goal_feet_yaw
         }
+        local previous_record = player_states[idx] and { layers = player_states[idx].layers } or nil
 
-        local prev_layer12 = data.prev_layers[12] or { cycle = 0, weight = 0 }
-        data.prev_layers[12] = layer12
-
-        local breaking_lby = is_breaking_lby(p, layer12, prev_layer12)
-
-        local diff = angle_diff(eye[2], original_goal_feet_yaw)
-        local side = diff <= 0
-
-        local resolved_yaw = eye[2]
-
-        if breaking_lby then
-            resolved_yaw = original_goal_feet_yaw
-            data.was_first_brute = false
-            data.was_second_brute = false
-        else
-            if math.abs(diff) > 80 then
-                resolved_yaw = original_goal_feet_yaw + (side and 120 or -120)
-            else
-                resolved_yaw = original_goal_feet_yaw + (side and 58 or -58)
-            end
+        if not resolvers[idx] then
+            resolvers[idx] = resolver:new()
         end
+        resolvers[idx]:initialize(pl, current_record, previous_record)
+        resolvers[idx]:resolve()
 
-        entity.set_prop(p, "m_angEyeAngles", original_pitch, norm_yaw(resolved_yaw), eye[3])
-
-        ::next::
+        ::continue::
     end
-end
+end)
+
+client.set_event_callback("round_start", function()
+    player_states = {}
+    lagged_states = {}
+    resolvers = {}
+    last_simtime = {}
+end)
 
 
 HellpineC = {
