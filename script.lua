@@ -2,6 +2,17 @@ local entity = require("gamesense/entity")
 local ui = require("gamesense/pui")
 local vector = require("vector")
 
+local air_strafe = ui.reference("Misc", "Movement", "Air strafe")
+local enable_it = ui.new_checkbox("LUA", "A", "FShot")
+
+client.set_event_callback("setup_command", function(c)
+    if (ui.get(enable_it)) then
+        local vel_x, vel_y = entity.get_prop(entity.get_local_player(), "m_vecVelocity")
+        local vel = math.sqrt(vel_x^2 + vel_y^2)
+        ui.set(air_strafe, not (c.in_jump and (vel < 10)) or ui.is_menu_open())
+    end
+end)
+
 local enable_resolver = ui.new_checkbox("LUA", "B", "Anti-Aim correction")
 
 
@@ -832,20 +843,6 @@ function lagcompensation:FixPvs(pCurEntity)
     pCurEntity:set_prop("m_iOcclusionFrame", globals.framecount())
     pCurEntity:set_prop("m_iOcclusionFlags", 0)
 end
-
-
-local air_strafe = ui.reference("Misc", "Movement", "Air strafe")
-local enable_it = ui.new_checkbox("LUA", "A", "FS")
-
-
-client.set_event_callback("setup_command", function(c)
-    if (ui.get(enable_it)) then
-        local vel_x, vel_y = entity.get_prop(entity.get_local_player(), "m_vecVelocity")
-        local vel = math.sqrt(vel_x^2 + vel_y^2)
-        ui.set(air_strafe, not (c.in_jump and (vel < 10)) or ui.is_menu_open())
-    end
-end)
-
 
 
 HellpineC = {
