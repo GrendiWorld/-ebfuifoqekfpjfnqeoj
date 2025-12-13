@@ -2,7 +2,7 @@ local entity = require "gamesense/entity"
 local ui = require "pui"
 local bit = require "bit"
 
-local enable = ui.checkbox("LUA", "A", "Resolver")
+local enable = ui.checkbox("RAGE", "Other", "Resolver")
 
 local sides = {}
 local default_rates = {left = 0.6875, right = -0.6875, low_left = 0.34375, center = 0.0}
