@@ -149,63 +149,74 @@ local function on_paint_lethal()
     if not weapon_ent then return end
 
     local weapon_idx = entity.get_prop(weapon_ent, "m_iItemDefinitionIndex")
+    if not weapon_idx then return end
+
     local weapon = csgo_weapons[weapon_idx]
     if not weapon then return end
 
     local alpha_head, alpha_chest, alpha_stomach, alpha_legs = get_lethal_alpha()
     local multiplier = hitbox_multiplier()
+
     local local_origin = vector(entity.get_origin(local_player))
+    if not local_origin then return end
 
     local enemies = entity.get_players(true)
     for i = 1, #enemies do
         local player = enemies[i]
+        if not player then goto continue end
+
         local hp = entity.get_prop(player, "m_iHealth")
-        if hp > 0 then
-            local target_origin = vector(entity.get_origin(player))
-            local distance = local_origin:dist(target_origin) * 0.01905
+        if not hp or hp <= 0 then goto continue end
 
-            local base_dmg = weapon.damage
-            local dmg = base_dmg * math.pow(weapon.range_modifier, distance / 500)
+        local target_origin = entity.get_origin(player)
+        if not target_origin then goto continue end
+        target_origin = vector(target_origin)
 
-            local armor = entity.get_prop(player, "m_ArmorValue")
-            if armor > 0 then
-                local armor_ratio = weapon.armor_ratio or 0.5
-                local dmg_to_armor = dmg * armor_ratio * 0.5
-                if dmg_to_armor > armor then
-                    dmg = base_dmg - (armor / 0.5)
-                else
-                    dmg = dmg - dmg_to_armor
-                end
-            end
+        local distance = local_origin:dist(target_origin) * 0.01905
 
-            local scaled_dmg = dmg * multiplier
+        local base_dmg = weapon.damage
+        local dmg = base_dmg * math.pow(weapon.range_modifier, distance / 500)
 
-            local hx, hy = renderer.world_to_screen(entity.hitbox_position(player, 0))
-            local cx, cy = renderer.world_to_screen(entity.hitbox_position(player, 4))
-            local sx, sy = renderer.world_to_screen(entity.hitbox_position(player, 6))
-            local lx, ly = renderer.world_to_screen(entity.hitbox_position(player, 7))
-            local rx, ry = renderer.world_to_screen(entity.hitbox_position(player, 8))
-
-            local x1, y1, x2, y2, visible = entity.get_bounding_box(player)
-            if x1 and visible > 0 then
-                local center_x = x1 + (x2 - x1) / 2
-                local dmg_y = y1 - 17
-
-                local dmg_r = scaled_dmg >= hp and 255 or 253
-                renderer.text(center_x, dmg_y, dmg_r, dmg_r, dmg_r, 255, "cb", 0, math.floor(scaled_dmg))
-
-                if hx and hy then renderer.text(hx, hy, 253, 69, 106, alpha_head, "cbd", 0, (dmg * 4 >= hp) and " " or "+") end
-                if cx and cy then renderer.text(cx, cy, 253, 69, 106, alpha_chest, "cbd", 0, (dmg >= hp) and " " or "+") end
-                if sx and sy then renderer.text(sx, sy, 253, 69, 106, alpha_stomach, "cbd", 0, (dmg * 1.25 >= hp) and " " or "+") end
-                if lx and ly then renderer.text(lx, ly, 253, 69, 106, alpha_legs, "cbd", 0, (dmg * 0.75 >= hp) and " " or "+") end
-                if rx and ry then renderer.text(rx, ry, 253, 69, 106, alpha_legs, "cbd", 0, (dmg * 0.75 >= hp) and " " or "+") end
-
-                if player == client.current_threat() then
-                    renderer.text(center_x - 12, dmg_y, 255, 255, 255, 255, "cbd", 0, "-")
-                    renderer.text(center_x + 12, dmg_y, 255, 255, 255, 255, "cbd", 0, "-")
-                end
+        local armor = entity.get_prop(player, "m_ArmorValue") or 0
+        if armor > 0 then
+            local armor_ratio = weapon.armor_ratio or 0.5
+            local dmg_to_armor = dmg * armor_ratio * 0.5
+            if dmg_to_armor > armor then
+                dmg = base_dmg - (armor / 0.5)
+            else
+                dmg = dmg - dmg_to_armor
             end
         end
+
+        local scaled_dmg = dmg * multiplier
+
+        local hx, hy = renderer.world_to_screen(entity.hitbox_position(player, 0))
+        local cx, cy = renderer.world_to_screen(entity.hitbox_position(player, 4))
+        local sx, sy = renderer.world_to_screen(entity.hitbox_position(player, 6))
+        local lx, ly = renderer.world_to_screen(entity.hitbox_position(player, 7))
+        local rx, ry = renderer.world_to_screen(entity.hitbox_position(player, 8))
+
+        local x1, y1, x2, y2, visible = entity.get_bounding_box(player)
+        if x1 and visible > 0 then
+            local center_x = x1 + (x2 - x1) / 2
+            local dmg_y = y1 - 17
+
+            local dmg_r = scaled_dmg >= hp and 255 or 253
+            renderer.text(center_x, dmg_y, dmg_r, dmg_r, dmg_r, 255, "cb", 0, math.floor(scaled_dmg))
+
+            if hx and hy then renderer.text(hx, hy, 253, 69, 106, alpha_head, "cbd", 0, (dmg * 4 >= hp) and " " or "+") end
+            if cx and cy then renderer.text(cx, cy, 253, 69, 106, alpha_chest, "cbd", 0, (dmg >= hp) and " " or "+") end
+            if sx and sy then renderer.text(sx, sy, 253, 69, 106, alpha_stomach, "cbd", 0, (dmg * 1.25 >= hp) and " " or "+") end
+            if lx and ly then renderer.text(lx, ly, 253, 69, 106, alpha_legs, "cbd", 0, (dmg * 0.75 >= hp) and " " or "+") end
+            if rx and ry then renderer.text(rx, ry, 253, 69, 106, alpha_legs, "cbd", 0, (dmg * 0.75 >= hp) and " " or "+") end
+
+            if player == client.current_threat() then
+                renderer.text(center_x - 12, dmg_y, 255, 255, 255, 255, "cbd", 0, "-")
+                renderer.text(center_x + 12, dmg_y, 255, 255, 255, 255, "cbd", 0, "-")
+            end
+        end
+
+        ::continue::
     end
 end
 
