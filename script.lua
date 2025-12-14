@@ -1,6 +1,384 @@
 local entity = require("gamesense/entity")
 local ui = require("gamesense/pui")
 local vector = require("vector")
+local csgo_weapons = require("gamesense/csgo_weapons")
+
+local enable_checkbox = ui.new_checkbox("LUA", "B", "JumpScout")
+local jump_scout_hotkey = ui.new_hotkey("LUA", "B", "JumpScout trigger key", true)
+
+local hit_chance_ref = ui.reference("RAGE", "Aimbot", "Minimum hit chance")
+local min_damage_ref = ui.reference("RAGE", "Aimbot", "Minimum damage")
+
+local previous_hit_chance = nil
+local previous_min_damage = nil
+
+client.set_event_callback("run_command", function(cmd)
+    if not ui.get(enable_checkbox) then
+        if previous_hit_chance ~= nil then
+            ui.set(hit_chance_ref, previous_hit_chance)
+            previous_hit_chance = nil
+        end
+        if previous_min_damage ~= nil then
+            ui.set(min_damage_ref, previous_min_damage)
+            previous_min_damage = nil
+        end
+        return
+    end
+
+    if not ui.get(jump_scout_hotkey) then
+        if previous_hit_chance ~= nil then
+            ui.set(hit_chance_ref, previous_hit_chance)
+            previous_hit_chance = nil
+        end
+        if previous_min_damage ~= nil then
+            ui.set(min_damage_ref, previous_min_damage)
+            previous_min_damage = nil
+        end
+        return
+    end
+
+    local lp = entity.get_local_player()
+    if not lp or not entity.is_alive(lp) then return end
+
+    local weapon = entity.get_player_weapon(lp)
+    if not weapon then return end
+
+    local weapon_id = entity.get_prop(weapon, "m_iItemDefinitionIndex")
+    if weapon_id ~= 40 then return end
+
+    local flags = entity.get_prop(lp, "m_fFlags")
+    local on_ground = bit.band(flags, 1) == 1
+
+    if not on_ground then
+        if previous_hit_chance == nil then
+            previous_hit_chance = ui.get(hit_chance_ref)
+            ui.set(hit_chance_ref, 0)
+        end
+        if previous_min_damage == nil then
+            previous_min_damage = ui.get(min_damage_ref)
+            ui.set(min_damage_ref, 1)
+        end
+    else
+        if previous_hit_chance ~= nil then
+            ui.set(hit_chance_ref, previous_hit_chance)
+            previous_hit_chance = nil
+        end
+        if previous_min_damage ~= nil then
+            ui.set(min_damage_ref, previous_min_damage)
+            previous_min_damage = nil
+        end
+    end
+end)
+
+ui.set_callback(enable_checkbox, function()
+    if not ui.get(enable_checkbox) then
+        if previous_hit_chance ~= nil then
+            ui.set(hit_chance_ref, previous_hit_chance)
+            previous_hit_chance = nil
+        end
+        if previous_min_damage ~= nil then
+            ui.set(min_damage_ref, previous_min_damage)
+            previous_min_damage = nil
+        end
+    end
+end)
+
+local enable_trashtalk = ui.new_checkbox("LUA", "A", "Trashtalk")
+
+local kill_messages = {
+    "ez", "ez tap", "1 tap", "nt", "nice try", "lmao", "owned", "gg ez", "too easy", "type 1"
+}
+
+local death_messages = {
+    "nt", "nice", "ez clap", "wp", "you win", "respect", "almost", "lag?", "nice one", "gg wp"
+}
+
+local function get_random_msg(messages)
+    return messages[math.random(#messages)]
+end
+
+local function on_player_death_trash(e)
+    if not ui.get(enable_trashtalk) then return end
+
+    local victim = client.userid_to_entindex(e.userid)
+    local attacker = client.userid_to_entindex(e.attacker)
+    local me = entity.get_local_player()
+
+    if not me or not victim or not attacker then return end
+
+    if attacker == me and entity.is_enemy(victim) then
+        client.exec("say " .. get_random_msg(kill_messages))
+    elseif victim == me and entity.is_enemy(attacker) then
+        client.exec("say " .. get_random_msg(death_messages))
+    end
+end
+
+client.set_event_callback("player_death", on_player_death_trash)
+
+local configure_combobox = ui.new_combobox("RAGE", "Other", "Hitbox Selection", "Stomach", "Chest", "Leg/feets")
+local static_mode_combobox = ui.new_multiselect("RAGE", "Other", "Hit Mark on:", "Head", "Chest", "Stomach", "Leg/feets")
+
+local function contains(tbl, val)
+    for i = 1, #tbl do
+        if tbl[i] == val then return true end
+    end
+    return false
+end
+
+local function hitbox_multiplier()
+    local sel = ui.get(configure_combobox)
+    if sel == "Stomach" then return 1.25
+    elseif sel == "Chest" then return 1
+    elseif sel == "Leg/feets" then return 0.75 end
+    return 1
+end
+
+local function get_lethal_alpha()
+    local head = contains(ui.get(static_mode_combobox), "Head") and 255 or 0
+    local chest = contains(ui.get(static_mode_combobox), "Chest") and 255 or 0
+    local stomach = contains(ui.get(static_mode_combobox), "Stomach") and 255 or 0
+    local legs = contains(ui.get(static_mode_combobox), "Leg/feets") and 255 or 0
+    return head, chest, stomach, legs
+end
+
+local function on_paint_lethal()
+    local local_player = entity.get_local_player()
+    if not local_player or not entity.is_alive(local_player) then return end
+
+    local weapon_ent = entity.get_player_weapon(local_player)
+    if not weapon_ent then return end
+
+    local weapon_idx = entity.get_prop(weapon_ent, "m_iItemDefinitionIndex")
+    local weapon = csgo_weapons[weapon_idx]
+    if not weapon then return end
+
+    local alpha_head, alpha_chest, alpha_stomach, alpha_legs = get_lethal_alpha()
+    local multiplier = hitbox_multiplier()
+    local local_origin = vector(entity.get_origin(local_player))
+
+    local enemies = entity.get_players(true)
+    for i = 1, #enemies do
+        local player = enemies[i]
+        local hp = entity.get_prop(player, "m_iHealth")
+        if hp > 0 then
+            local target_origin = vector(entity.get_origin(player))
+            local distance = local_origin:dist(target_origin) * 0.01905
+
+            local base_dmg = weapon.damage
+            local dmg = base_dmg * math.pow(weapon.range_modifier, distance / 500)
+
+            local armor = entity.get_prop(player, "m_ArmorValue")
+            if armor > 0 then
+                local armor_ratio = weapon.armor_ratio or 0.5
+                local dmg_to_armor = dmg * armor_ratio * 0.5
+                if dmg_to_armor > armor then
+                    dmg = base_dmg - (armor / 0.5)
+                else
+                    dmg = dmg - dmg_to_armor
+                end
+            end
+
+            local scaled_dmg = dmg * multiplier
+
+            local hx, hy = renderer.world_to_screen(entity.hitbox_position(player, 0))
+            local cx, cy = renderer.world_to_screen(entity.hitbox_position(player, 4))
+            local sx, sy = renderer.world_to_screen(entity.hitbox_position(player, 6))
+            local lx, ly = renderer.world_to_screen(entity.hitbox_position(player, 7))
+            local rx, ry = renderer.world_to_screen(entity.hitbox_position(player, 8))
+
+            local x1, y1, x2, y2, visible = entity.get_bounding_box(player)
+            if x1 and visible > 0 then
+                local center_x = x1 + (x2 - x1) / 2
+                local dmg_y = y1 - 17
+
+                local dmg_r = scaled_dmg >= hp and 255 or 253
+                renderer.text(center_x, dmg_y, dmg_r, dmg_r, dmg_r, 255, "cb", 0, math.floor(scaled_dmg))
+
+                if hx and hy then renderer.text(hx, hy, 253, 69, 106, alpha_head, "cbd", 0, (dmg * 4 >= hp) and " " or "+") end
+                if cx and cy then renderer.text(cx, cy, 253, 69, 106, alpha_chest, "cbd", 0, (dmg >= hp) and " " or "+") end
+                if sx and sy then renderer.text(sx, sy, 253, 69, 106, alpha_stomach, "cbd", 0, (dmg * 1.25 >= hp) and " " or "+") end
+                if lx and ly then renderer.text(lx, ly, 253, 69, 106, alpha_legs, "cbd", 0, (dmg * 0.75 >= hp) and " " or "+") end
+                if rx and ry then renderer.text(rx, ry, 253, 69, 106, alpha_legs, "cbd", 0, (dmg * 0.75 >= hp) and " " or "+") end
+
+                if player == client.current_threat() then
+                    renderer.text(center_x - 12, dmg_y, 255, 255, 255, 255, "cbd", 0, "-")
+                    renderer.text(center_x + 12, dmg_y, 255, 255, 255, 255, "cbd", 0, "-")
+                end
+            end
+        end
+    end
+end
+
+client.set_event_callback("paint", on_paint_lethal)
+
+local ui_enable = ui.new_checkbox("LUA", "A", "Wireframe Onshot")
+local ui_mode = ui.new_combobox("LUA", "A", "Color Mode", "Static", "Rainbow")
+local ui_color = ui.new_color_picker("LUA", "A", "Static Color", 255, 50, 50, 255)
+local ui_duration = ui.new_slider("LUA", "A", "Duration (sec)", 1, 10, 4, true, "s", 0.1)
+local ui_speed = ui.new_slider("LUA", "A", "Rainbow Speed", 1, 30, 10, true, "", 1)
+
+local last_shot_tick = {}
+local killed_players = {}
+local rainbow_offset = 0
+
+local function hsv_to_rgb(h, s, v)
+    h = (h % 360) / 360
+    local i = math.floor(h * 6)
+    local f = h * 6 - i
+    local p = v * (1 - s)
+    local q = v * (1 - f * s)
+    local t = v * (1 - (1 - f) * s)
+
+    local r, g, b
+    if i == 0 then r, g, b = v, t, p
+    elseif i == 1 then r, g, b = q, v, p
+    elseif i == 2 then r, g, b = p, v, t
+    elseif i == 3 then r, g, b = p, q, v
+    elseif i == 4 then r, g, b = t, p, v
+    else r, g, b = v, p, q end
+
+    return r * 255, g * 255, b * 255
+end
+
+local function update_visibility()
+    local mode = ui.get(ui_mode)
+    ui.set_visible(ui_color, mode == "Static")
+    ui.set_visible(ui_speed, mode == "Rainbow")
+end
+ui.set_callback(ui_mode, update_visibility)
+update_visibility()
+
+local function on_aim_fire(e)
+    if not ui.get(ui_enable) then return end
+    local target = e.target
+    if target and entity.is_enemy(target) and entity.is_alive(target) then
+        last_shot_tick[target] = globals.tickcount()
+    end
+end
+
+local function on_player_death_wire(e)
+    if not ui.get(ui_enable) then return end
+    local attacker = client.userid_to_entindex(e.attacker)
+    local victim = client.userid_to_entindex(e.userid)
+    local me = entity.get_local_player()
+    if attacker ~= me or not entity.is_enemy(victim) then return end
+
+    local tick = last_shot_tick[victim]
+    if tick then
+        killed_players[victim] = {time = globals.curtime(), tick = tick}
+        last_shot_tick[victim] = nil
+    end
+end
+
+local function on_paint_wire()
+    if not ui.get(ui_enable) then
+        killed_players = {}
+        return
+    end
+
+    local curtime = globals.curtime()
+    local duration = ui.get(ui_duration)
+    local mode = ui.get(ui_mode)
+    local speed = ui.get(ui_speed)
+
+    rainbow_offset = rainbow_offset + globals.frametime() * speed * 36
+
+    for ent, data in pairs(killed_players) do
+        if curtime - data.time > duration then
+            killed_players[ent] = nil
+        else
+            local r, g, b, a
+            if mode == "Rainbow" then
+                r, g, b = hsv_to_rgb(rainbow_offset + (ent * 30), 1, 1)
+                a = 255
+            else
+                r, g, b, a = ui.get(ui_color)
+            end
+            client.draw_hitboxes(ent, duration + 2, -1, r, g, b, a, data.tick, true)
+        end
+    end
+end
+
+client.set_event_callback("aim_fire", on_aim_fire)
+client.set_event_callback("player_death", on_player_death_wire)
+client.set_event_callback("paint", on_paint_wire)
+
+client.set_event_callback("shutdown", function()
+    killed_players = {}
+    last_shot_tick = {}
+end)
+
+local tracer_enabled = ui.new_checkbox("LUA", "B", "Bullet tracers")
+local tracer_color = ui.new_color_picker("LUA", "B", "Color", 255, 255, 255, 255)
+local tracer_duration = ui.new_slider("LUA", "B", "Duration", 1, 50, 20, true, "s", 0.1)
+local tracer_thickness = ui.new_slider("LUA", "B", "Thickness", 1, 5, 1, true, "px")
+local tracer_fade = ui.new_checkbox("LUA", "B", "Fade effect")
+
+local tracer_queue = {}
+local max_tracers = 50
+
+local function calculate_fade_alpha(start_time, duration, curtime)
+    if not ui.get(tracer_fade) then return 255 end
+    local elapsed = curtime - start_time
+    local progress = elapsed / duration
+    return math.max(0, math.floor(255 * (1 - progress)))
+end
+
+client.set_event_callback("bullet_impact", function(e)
+    if not ui.get(tracer_enabled) then return end
+    local me = entity.get_local_player()
+    if client.userid_to_entindex(e.userid) ~= me then return end
+
+    local lx, ly, lz = client.eye_position()
+    local curtime = globals.curtime()
+    local duration = ui.get(tracer_duration) * 0.1
+
+    local key = globals.tickcount()
+    tracer_queue[key] = {
+        start_x = lx, start_y = ly, start_z = lz,
+        end_x = e.x, end_y = e.y, end_z = e.z,
+        start_time = curtime, duration = duration
+    }
+
+    local count = 0
+    for k in pairs(tracer_queue) do
+        count = count + 1
+        if count > max_tracers then tracer_queue[k] = nil end
+    end
+end)
+
+client.set_event_callback("paint", function()
+    if not ui.get(tracer_enabled) then return end
+
+    local curtime = globals.curtime()
+    local r, g, b = ui.get(tracer_color)
+    local thickness = ui.get(tracer_thickness)
+
+    for _, data in pairs(tracer_queue) do
+        if curtime <= data.start_time + data.duration then
+            local x1, y1 = renderer.world_to_screen(data.start_x, data.start_y, data.start_z)
+            local x2, y2 = renderer.world_to_screen(data.end_x, data.end_y, data.end_z)
+            if x1 and x2 and y1 and y2 then
+                local alpha = calculate_fade_alpha(data.start_time, data.duration, curtime)
+                renderer.line(x1, y1, x2, y2, r, g, b, alpha, thickness)
+            end
+        end
+    end
+
+    for k, data in pairs(tracer_queue) do
+        if curtime > data.start_time + data.duration then
+            tracer_queue[k] = nil
+        end
+    end
+end)
+
+client.set_event_callback("round_prestart", function()
+    tracer_queue = {}
+end)
+
+client.set_event_callback("shutdown", function()
+    tracer_queue = {}
+end)
 
 local enable_resolver = ui.new_checkbox("LUA", "B", "Anti-Aim correction")
 
