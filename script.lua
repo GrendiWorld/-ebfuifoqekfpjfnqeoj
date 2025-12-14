@@ -2,67 +2,6 @@ local entity = require("gamesense/entity")
 local ui = require("gamesense/pui")
 local vector = require("vector")
 
-
-
-local enable_checkbox = ui.new_checkbox("LUA", "B", "JumpScout")
-local jump_scout_hotkey = ui.new_hotkey("LUA", "B", "JumpScout trigger key", true)
-
-local hit_chance_ref = ui.reference("RAGE", "Aimbot", "Minimum hit chance")
-local min_damage_ref = ui.reference("RAGE", "Aimbot", "Minimum damage")
-
-local previous_hit_chance = nil
-local previous_min_damage = nil
-
-client.set_event_callback("run_command", function(cmd)
-    
-    if not ui.get(enable_checkbox) then
-        if previous_hit_chance ~= nil then
-            ui.set(hit_chance_ref, previous_hit_chance)
-            previous_hit_chance = nil
-        end
-        if previous_min_damage ~= nil then
-            ui.set(min_damage_ref, previous_min_damage)
-            previous_min_damage = nil
-        end
-        return
-    end
-
-   
-    if not ui.get(jump_scout_hotkey) then
-        if previous_hit_chance ~= nil then
-            ui.set(hit_chance_ref, previous_hit_chance)
-            previous_hit_chance = nil
-        end
-        if previous_min_damage ~= nil then
-            ui.set(min_damage_ref, previous_min_damage)
-            previous_min_damage = nil
-        end
-        return
-    end
-
-    local lp = entity.get_local_player()
-    if not lp or not entity.is_alive(lp) then return end
-
-    local weapon = entity.get_player_weapon(lp)
-    if not weapon then return end
-
-    local weapon_id = entity.get_prop(weapon, "m_iItemDefinitionIndex")
-    if weapon_id ~= 40 then return end  
-
-    local flags = entity.get_prop(lp, "m_fFlags")
-    local on_ground = bit.band(flags, 1) == 1
-
-    if not on_ground then
-        
-        if previous_hit_chance == nil then
-            previous_hit_chance = ui.get(hit_chance_ref)
-            ui.set(hit_chance_ref, 0)
-        end
-        if previous_min_damage == nil then
-            previous_min_damage = ui.get(min_damage_ref)
-            ui.set(min_damage_ref, 1)
-			end
-
 local enable_resolver = ui.new_checkbox("LUA", "B", "Anti-Aim correction")
 
 
