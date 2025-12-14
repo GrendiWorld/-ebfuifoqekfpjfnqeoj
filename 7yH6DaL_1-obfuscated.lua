@@ -1774,6 +1774,4 @@ end)
 
 client.set_event_callback("paint", HellpineC.ClanTag.run)
 client.color_log(0, 255, 150, "[resolver] I fuck hvh")
-
-client.set_event_callback("net_update_end", run)
 client.set_event_callback("round_start", function() storage = {} last_choked = {} end)
