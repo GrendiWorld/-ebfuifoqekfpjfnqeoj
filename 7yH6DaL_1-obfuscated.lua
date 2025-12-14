@@ -5,7 +5,7 @@ local vector = require("vector")
 local vector = require("vector")
 local csgo_weapons = require("gamesense/csgo_weapons")
 
-local enable_checkbox = ui.new_checkbox("LUA", "B", "JumpScout")
+local enable_checkbox = ui.new_checkbox("LUA", "B", "JumpScout(NS)")
 local jump_scout_hotkey = ui.new_hotkey("LUA", "B", "JumpScout trigger key", true)
 
 local hit_chance_ref = ui.reference("RAGE", "Aimbot", "Minimum hit chance")
