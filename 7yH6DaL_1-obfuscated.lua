@@ -1,4 +1,4 @@
-local entity = require("gamesense/entity")
+
 local ui = require("gamesense/pui")
 local vector = require("vector")
 
