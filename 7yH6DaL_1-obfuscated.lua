@@ -1690,55 +1690,6 @@ client.set_event_callback("shutdown", function()
     tracer_queue = {}
 end)
 
-local enable = ui.new_checkbox("LUA", "A", "Thinking mode")
-
-local multipoint = ui.reference("RAGE", "Aimbot", "Multi-point")
-local mp_scale = ui.reference("RAGE", "Aimbot", "Multi-point scale")
-local force_safe = ui.reference("RAGE", "Aimbot", "Force safe point")
-
-local orig_mp = ui.get(multipoint)
-local orig_scale = ui.get(mp_scale)
-local orig_safe = ui.get(force_safe)
-
-local function restore()
-    ui.set(multipoint, orig_mp)
-    ui.set(mp_scale, orig_scale)
-    ui.set(force_safe, orig_safe)
-end
-
-local function on_setup()
-    if not ui.get(enable) then return end
-    local lp = entity.get_local_player()
-    if not lp or not entity.is_alive(lp) then return end
-    local enemies = entity.get_players(true)
-    if #enemies == 0 then return end
-    local closest, dist = nil, math.huge
-    local ex, ey, ez = client.eye_position()
-    for i, v in ipairs(enemies) do
-        if entity.is_dormant(v) then goto cont end
-        local hx, hy, hz = entity.hitbox_position(v, 0)
-        local d = (hx-ex)^2 + (hy-ey)^2 + (hz-ez)^2
-        if d < dist then
-            dist = d
-            closest = v
-        end
-        ::cont::
-    end
-    if not closest then return end
-    local hx, hy, hz = entity.hitbox_position(closest, 0)
-    local fraction, hit = client.trace_line(lp, ex, ey, ez, hx, hy, hz)
-    local visible = fraction == 1.0 or hit == closest
-    if visible then
-        restore()
-    else
-        ui.set(multipoint, {false})
-        ui.set(mp_scale, 90)
-        ui.set(force_safe, true)
-    end
-end
-
-client.set_event_callback("setup_command", on_setup)
-
 local enable = ui.checkbox("LUA", "A", "Defensive Fix")
 
 local sides = {}
