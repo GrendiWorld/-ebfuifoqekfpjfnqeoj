@@ -585,13 +585,17 @@ pui.macros.ab = "\aC71585FF"
 						end),
 
 						notify = group.a:multiselect("\f<d>Notify options", {"Hit", "Miss"}),
-						notify_style = group.a:combobox("\n soon ", {"Soon"})
+						notify_style = group.a:combobox("\n soon ", {"Soon"}),
+					    
+			            ClanTag = group.a:checkbox("ClanTag")
+
 					},
 
 					helpers = {
 						trashtalk = group.a:checkbox("Trashtalk"),
 						FastLadder = group.a:checkbox("Fast Ladder"),
                         breaker = group.a:checkbox("Animation breaker"),
+						ClanTag = group.a:checkbox("ClanTag"),
 
                     }
 				},
@@ -677,8 +681,8 @@ pui.macros.ab = "\aC71585FF"
 				aa.defpitchrand_tick = group.a:slider("\f<d> Tick\nrandom sta" .. c, 1, 12, 1, true, "t", 1):depend({aa.defensive_yaw, "Off", true}, {aa.defpitch, "Random static"})
 
 				aa.defss2 = group.o:label("\n tr"):depend({aa.defensive_yaw, "Off", true})
-				--aa.defpitchtriggers = group.o:multiselect("\f<d>Defensive \f<a>triggers" .. c, {"Always", "Tick", "Weapon switch"}):depend({aa.defensive_yaw, "Off", true})
-				--aa.defpitchtrigger_t = group.o:slider("\n trigger tick" .. c, 1, 13, 1, true, "t", 1):depend({aa.defensive_yaw, "Off", true}, {aa.defpitchtriggers, "Tick"})
+				aa.defpitchtriggers = group.o:multiselect("\f<d>Defensive \f<a>triggers" .. c, {"Always", "Tick", "Weapon switch"}):depend({aa.defensive_yaw, "Off", true})
+				aa.defpitchtrigger_t = group.o:slider("\n trigger tick" .. c, 1, 13, 1, true, "t", 1):depend({aa.defensive_yaw, "Off", true}, {aa.defpitchtriggers, "Tick"})
 
 				for _, v in pairs(aa) do
 					local arr = {{menu.antiaim.builder.state_curr, state}}
@@ -1275,6 +1279,11 @@ local defensive = {
 
 	activatee = function(self)
     	local me = entity.get_local_player()
+
+		if me == nil and not entity.is_alive(me) then 
+			return 
+		end
+
     	local tickcount = globals.tickcount()
     	local sim_time = entity.get_prop(me, "m_flSimulationTime")
     	local sim_diff = toticks(sim_time - self.sim_time)
@@ -1913,6 +1922,59 @@ local cals = {
 		end
 	},
 
+	ClanTag = {
+		last_tag = "",
+		run = function(self)
+			if not menu.options.vis.ClanTag:get() then 
+				if self.last_tag ~= "" then
+					client.set_clan_tag("")
+					self.last_tag = ""
+				end
+				return 
+			end
+
+			local tag_frames = {
+				"hellpine.xyz",
+            "hellpine.xy ",
+            "hellpine.x  ",
+            "hellpine   ",
+            "hellpin    ",
+            "hellp     ",
+            "hel      ",
+            "he       ",
+            "h        ",
+            "         ",
+            "        h",
+            "       he",
+            "      hel",
+            "     hell",
+            "    hellp",
+            "   hellpi",
+            "  hellpin",
+            " hellpine",
+            "hellpine ",
+            "hellpine.",
+            "hellpine.x",
+            "hellpine.xy",
+            "hellpine.xyz",
+            "hellpine.xyz|",
+            "|hellpine.xyz",
+            "hellpine.xyz ",
+            " hellpine.xyz",
+            "hellpine.xyz"
+			}
+
+			local speed = 2.5
+			local tick = math.floor(globals.curtime() * speed % #tag_frames) + 1
+			local current_tag = tag_frames[tick]
+
+			if current_tag ~= self.last_tag then
+				client.set_clan_tag(current_tag)
+				self.last_tag = current_tag
+			end
+		end
+	},
+	
 	viewmodel = {
 		active = function(self)
 			return menu.options.vis.viewmodel:get()
@@ -2189,6 +2251,7 @@ for _, data in ipairs({
 		cals.viewmodel:run()
 		cals.crosshair:run()
 		cals.dmgmarker:run()
+		cals.ClanTag:run()
 	end},
 
 	{"paint_ui", function()
@@ -2196,6 +2259,11 @@ for _, data in ipairs({
 		cals.menu_setup()
 	end},
 
+	{"setup_command", function(cmd) 
+        if antiaim then antiaim:run(cmd) end
+        if cals.ladder then cals.ladder:run(cmd) end
+    end},
+	
 	{"shutdown", function(self)
 		phobia.ui:show(true)
 	end},
