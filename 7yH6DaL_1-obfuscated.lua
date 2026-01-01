@@ -55,7 +55,6 @@ local bit = require 'bit'
 local vector = require("vector")
 local json = require("json")
 local trace = require ("gamesense/trace")
-local pui = require("gamesense/pui")
 local base64 = require("gamesense/base64")
 --local http = require('gamesense/http')
 local clipboard = require("gamesense/clipboard")
