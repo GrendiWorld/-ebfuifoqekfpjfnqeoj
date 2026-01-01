@@ -2,7 +2,7 @@
 local ui = require("gamesense/pui")
 local vector = require("vector")
 
-local menu_reference = ui.new_checkbox("LUA", "B", "Thinking Mode")
+local menu_reference = ui.new_checkbox("RAGE", "Other", "Thinking Mode")
 local hitboxes_ref = ui.reference("RAGE", "Aimbot", "Target hitbox")
 local accuracy_boost_ref = ui.reference("RAGE", "Other", "Accuracy boost")
 local slow_walk_ref, slow_walk_key = ui.reference("AA", "Other", "Slow motion")
@@ -16,48 +16,45 @@ local function on_setup_command(cmd)
     if weapon == nil then return end
     
     local weapon_id = entity.get_prop(weapon, "m_iItemDefinitionIndex")
+    local my_pos = {entity.get_origin(me)}
 
     for i=1, #enemies do
         local ent = enemies[i]
         local health = entity.get_prop(ent, "m_iHealth")
         
-        local head_pos = {entity.hitbox_position(ent, 0)}
-        local chest_pos = {entity.hitbox_position(ent, 2)}
-        local pelvis_pos = {entity.hitbox_position(ent, 3)}
+        local h_pos = {entity.hitbox_position(ent, 0)}
+        local c_pos = {entity.hitbox_position(ent, 2)}
+        local p_pos = {entity.hitbox_position(ent, 3)}
 
-        local head_visible = client.visible(head_pos[1], head_pos[2], head_pos[3])
-        local chest_visible = client.visible(chest_pos[1], chest_pos[2], chest_pos[3])
-        local pelvis_visible = client.visible(pelvis_pos[1], pelvis_pos[2], pelvis_pos[3])
+        local head_vis = client.visible(h_pos[1], h_pos[2], h_pos[3])
+        local chest_vis = client.visible(c_pos[1], c_pos[2], c_pos[3])
+        local pelvis_vis = client.visible(p_pos[1], p_pos[2], p_pos[3])
+
+        local dist = math.sqrt((my_pos[1]-h_pos[1])^2 + (my_pos[2]-h_pos[2])^2 + (my_pos[3]-h_pos[3])^2)
 
         if ui.get(slow_walk_ref) and ui.get(slow_walk_key) then
             ui.set(accuracy_boost_ref, "Maximum")
         else
-            ui.set(accuracy_boost_ref, "Medium")
+            ui.set(accuracy_boost_ref, "Low")
         end
 
-        local should_baim = false
+        local set_hitboxes = {"Head", "Chest", "Stomach"}
 
-        if not head_visible and (chest_visible or pelvis_visible) then
-            should_baim = true
-        elseif health < 45 then
-            should_baim = true
-        elseif head_visible and chest_visible then
-            if health < 70 and (weapon_id == 9 or weapon_id == 40) then
-                should_baim = true
+        if not head_vis and (chest_vis or pelvis_vis) then
+            set_hitboxes = {"Chest", "Stomach", "Pelvis"}
+        elseif health < 50 or (dist > 1000 and head_vis) then
+            set_hitboxes = {"Chest", "Stomach", "Pelvis"}
+        elseif head_vis and (weapon_id == 9 or weapon_id == 40) then
+            if health < 75 then
+                set_hitboxes = {"Chest", "Stomach", "Pelvis"}
             end
+        elseif not head_vis and not chest_vis and not pelvis_vis then
+            set_hitboxes = {"Head", "Chest", "Stomach", "Feet", "Legs"}
         end
 
-        if should_baim then
-            ui.set(hitboxes_ref, {"Chest", "Stomach", "Pelvis"})
-        else
-            if not head_visible and not chest_visible and not pelvis_visible then
-                ui.set(hitboxes_ref, {"Head", "Chest", "Stomach", "Feet", "Legs"})
-            else
-                ui.set(hitboxes_ref, {"Head", "Chest", "Stomach"})
-            end
-        end
+        ui.set(hitboxes_ref, set_hitboxes)
 
-        if (weapon_id == 1 or weapon_id == 64) and head_visible then
+        if (weapon_id == 1 or weapon_id == 64) and head_vis then
             ui.set(accuracy_boost_ref, "Maximum")
         end
     end
