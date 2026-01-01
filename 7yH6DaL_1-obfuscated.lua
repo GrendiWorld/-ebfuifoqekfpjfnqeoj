@@ -553,7 +553,7 @@ manual = self.depends(group.a:checkbox("Manuals"), function()
         group.a:hotkey("\f<d>Left \f"),
         group.a:hotkey("\f<d>Right \f"),
         group.a:hotkey("\f<d>Forward"),
-        self:header(group.a)
+       -- self:header(group.a)
     }
 end),
 						fs = self.depends(group.a:checkbox("Freestand", 0), function() -- menu.antiaim.general.fs
