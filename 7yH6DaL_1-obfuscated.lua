@@ -53,7 +53,7 @@ local vector = require("vector")
 local json = require("json")
 local trace = require ("gamesense/trace")
 local base64 = require("gamesense/base64")
-local pui = pui("gamesense/pui")
+local pui = require("gamesense/pui")
 --local http = require('gamesense/http')
 local clipboard = require("gamesense/clipboard")
 
