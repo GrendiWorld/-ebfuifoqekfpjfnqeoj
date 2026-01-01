@@ -548,15 +548,14 @@ pui.macros.ab = "\aC71585FF"
 
 						space2 = group.a:label("\n"),
 
-						manual = self.depends(group.a:checkbox("Manuals"), function() -- get_manual
-							return {
-								group.a:hotkey("\f<d>Left \f"),
-								group.a:hotkey("\f<d>Right \f"),
-								group.a:hotkey("\f<d>Forward"),
-								self:header(group.a)
-							}, true
-						end),
-
+manual = self.depends(group.a:checkbox("Manuals"), function()
+    return {
+        group.a:hotkey("\f<d>Left \f"),
+        group.a:hotkey("\f<d>Right \f"),
+        group.a:hotkey("\f<d>Forward"),
+        self:header(group.a)
+    }
+end),
 						fs = self.depends(group.a:checkbox("Freestand", 0), function() -- menu.antiaim.general.fs
 							return {
 								group.a:checkbox("\f<d>Static"),
