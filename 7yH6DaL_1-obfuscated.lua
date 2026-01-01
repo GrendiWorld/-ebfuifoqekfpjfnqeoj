@@ -2,7 +2,7 @@
 local ui = require("gamesense/pui")
 local vector = require("vector")
 
-local menu_reference = ui.new_checkbox("RAGE", "Other", "Thinking Mode")
+local menu_reference = ui.new_checkbox("LUA", "B", "Thinking Mode")
 local hitboxes_ref = ui.reference("RAGE", "Aimbot", "Target hitbox")
 local accuracy_boost_ref = ui.reference("RAGE", "Other", "Accuracy boost")
 local slow_walk_ref, slow_walk_key = ui.reference("AA", "Other", "Slow motion")
