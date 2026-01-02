@@ -2,23 +2,22 @@ local ui = require("gamesense/pui")
 local vector = require("vector")
 
 local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
-
-
 local hitboxes_ref = { ui.reference("RAGE", "Aimbot", "Target hitbox") }
-local accuracy_boost_ref = ui.reference("RAGE", "Other", "Accuracy boost")
 
 local function on_setup_command(cmd)
     if not ui.get(menu_reference) then return end
 
     local me = entity.get_local_player()
+    if me == nil or not entity.is_alive(me) then return end
+
     local enemies = entity.get_players(true)
     if #enemies == 0 then return end
 
-    
-    ui.set(accuracy_boost_ref, "Maximum")
-
     for i=1, #enemies do
         local ent = enemies[i]
+        
+        if not entity.is_alive(ent) or entity.is_dormant(ent) then goto skip end
+
         local health = entity.get_prop(ent, "m_iHealth")
         
         local h_x, h_y, h_z = entity.hitbox_position(ent, 0)
@@ -32,9 +31,8 @@ local function on_setup_command(cmd)
 
         local hb_to_set = {"Head", "Chest", "Stomach"}
 
-        local local_x, local_y, local_z = entity.get_origin(me)
-        
-        local distance = math.sqrt((local_x - h_x)^2 + (local_y - h_y)^2 + (local_z - h_z)^2)
+        local lx, ly, lz = entity.get_origin(me)
+        local distance = math.sqrt((lx - h_x)^2 + (ly - h_y)^2 + (lz - h_z)^2)
 
         if not head_vis and body_vis then
             hb_to_set = {"Chest", "Stomach", "Pelvis"}
@@ -46,7 +44,6 @@ local function on_setup_command(cmd)
             hb_to_set = {"Head", "Chest", "Stomach", "Feet", "Legs"}
         end
 
-        
         ui.set(hitboxes_ref[1], hb_to_set)
 
         ::skip::
