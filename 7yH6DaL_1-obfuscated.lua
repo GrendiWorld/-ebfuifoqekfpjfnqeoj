@@ -2,7 +2,7 @@ local ui = require("gamesense/pui")
 local vector = require("vector")
 
 local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
--- Костыль через select(1, ...) — берем строго первый аргумент из тех, что вернет чит
+
 local hitboxes_ref = select(1, ui.reference("RAGE", "Aimbot", "Target hitbox"))
 
 local function on_setup_command(cmd)
@@ -43,7 +43,7 @@ local function on_setup_command(cmd)
             hb_to_set = {"Head", "Chest", "Stomach", "Feet", "Legs"}
         end
 
-        -- Вызываем set только если ссылка валидна
+        
         if hitboxes_ref then
             ui.set(hitboxes_ref, unpack(hb_to_set))
         end
@@ -54,89 +54,6 @@ end
 
 client.set_event_callback("setup_command", on_setup_command)
 
-local hitbox_names = {[0] = "generic", [1] = "head", [2] = "chest", [3] = "stomach", [4] = "left arm", [5] = "right arm", [6] = "left leg", [7] = "right leg", [10] = "gear"}
-local last_shot = {hc = 0, bt = 0}
-
-client.set_event_callback("aim_fire", function(e)
-    last_shot.hc = math.floor(e.hit_chance or 0)
-    last_shot.bt = e.backtrack or 0
-end)
-
-client.set_event_callback("player_hurt", function(e)
-    if client.userid_to_entindex(e.attacker) ~= entity.get_local_player() then return end
-    local name = entity.get_player_name(client.userid_to_entindex(e.userid))
-    local h_name = hitbox_names[e.hitgroup] or "body"
-    
-    client.color_log(170, 190, 255, "[hellpine.xyz] \0")
-    client.color_log(255, 255, 255, "Hit \0")
-    client.color_log(255, 120, 180, name .. " \0")
-    client.color_log(255, 255, 255, "in \0")
-    client.color_log(170, 190, 255, " " .. h_name .. " \0")
-    client.color_log(255, 255, 255, "for \0")
-    client.color_log(255, 255, 100, " " .. tostring(e.dmg_health) .. " \0")
-    client.color_log(255, 255, 255, "(" .. tostring(e.health) .. "hp) \0")
-    client.color_log(150, 150, 150, " [hc:" .. last_shot.hc .. "% bt:" .. last_shot.bt .. "t]\0")
-    client.color_log(255, 255, 255, " ")
-end)
-
-client.set_event_callback("aim_miss", function(e)
-    local name = entity.get_player_name(e.target)
-    local h_name = hitbox_names[e.hitbox] or "body"
-    local reason = e.reason
-    
-    local r, g, b = 255, 255, 255
-    local out_reason = ""
-
-    if reason == "correction" then
-        local mask_rnd = client.random_int(1, 3)
-        if mask_rnd == 1 then
-            out_reason = "luck (spread)"
-            r, g, b = 255, 160, 50
-        elseif mask_rnd == 2 then
-            out_reason = "server-side"
-            r, g, b = 255, 255, 100
-        else
-            out_reason = "velocity compensation"
-            r, g, b = 100, 255, 200
-        end
-    
-    elseif reason == "spread" then
-        out_reason = "luck (spread)"
-        r, g, b = 255, 160, 50
-    elseif reason == "death" then
-        out_reason = "target died"
-        r, g, b = 150, 150, 150
-    elseif reason == "occlusion" then
-        out_reason = "occlusion (thick wall)"
-        r, g, b = 130, 200, 130
-    elseif reason == "unregistered" then
-        out_reason = "server-side (no-reg)"
-        r, g, b = 255, 255, 100
-    elseif reason == "backtrack" then
-        out_reason = "backtrack (expired tick)"
-        r, g, b = 100, 200, 255
-    elseif reason == "prediction error" or reason == "misprediction" then
-        out_reason = "prediction (movement)"
-        r, g, b = 200, 150, 255
-    elseif reason == "animation" then
-        out_reason = "animation desync"
-        r, g, b = 255, 100, 180
-    else
-        
-        out_reason = tostring(reason)
-        r, g, b = 255, 255, 255
-    end
-
-    client.color_log(255, 80, 80, "[hellpine.xyz] \0")
-    client.color_log(255, 255, 255, "Missed \0")
-    client.color_log(255, 120, 180, name .. " \0")
-    client.color_log(255, 255, 255, "in \0")
-    client.color_log(170, 190, 255, " " .. h_name .. " \0")
-    client.color_log(255, 255, 255, "due to \0")
-    client.color_log(r, g, b, " " .. out_reason .. " \0")
-    client.color_log(150, 150, 150, "[hc:" .. tostring(last_shot.hc) .. "%]\0")
-    client.color_log(255, 255, 255, " ")
-end)
 
 local enable_resolver = ui.new_checkbox("LUA", "B", "Anti-Aim correction")
 
