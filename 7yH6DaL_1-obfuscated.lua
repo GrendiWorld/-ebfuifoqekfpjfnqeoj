@@ -2,7 +2,10 @@ local ui = require("gamesense/pui")
 local vector = require("vector")
 
 local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
-local hitboxes_ref = ui.reference("RAGE", "Aimbot", "Target hitbox")
+
+
+local hitboxes_ref = { ui.reference("RAGE", "Aimbot", "Target hitbox") }
+local accuracy_boost_ref = ui.reference("RAGE", "Other", "Accuracy boost")
 
 local function on_setup_command(cmd)
     if not ui.get(menu_reference) then return end
@@ -10,6 +13,9 @@ local function on_setup_command(cmd)
     local me = entity.get_local_player()
     local enemies = entity.get_players(true)
     if #enemies == 0 then return end
+
+    
+    ui.set(accuracy_boost_ref, "Maximum")
 
     for i=1, #enemies do
         local ent = enemies[i]
@@ -26,8 +32,8 @@ local function on_setup_command(cmd)
 
         local hb_to_set = {"Head", "Chest", "Stomach"}
 
-        local origin_x, origin_y, origin_z = entity.get_origin(ent)
         local local_x, local_y, local_z = entity.get_origin(me)
+        
         local distance = math.sqrt((local_x - h_x)^2 + (local_y - h_y)^2 + (local_z - h_z)^2)
 
         if not head_vis and body_vis then
@@ -40,7 +46,8 @@ local function on_setup_command(cmd)
             hb_to_set = {"Head", "Chest", "Stomach", "Feet", "Legs"}
         end
 
-        ui.set(hitboxes_ref, hb_to_set)
+        
+        ui.set(hitboxes_ref[1], hb_to_set)
 
         ::skip::
     end
