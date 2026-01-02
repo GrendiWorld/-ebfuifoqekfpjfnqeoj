@@ -2,23 +2,11 @@ local ui = require("gamesense/pui")
 local vector = require("vector")
 
 local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
-
-
-local function get_reference(tab, container, name)
-    local success, results = pcall(function() 
-        return {ui.reference(tab, container, name)} 
-    end)
-    if success and results[1] then 
-        return results[1] 
-    end
-    return nil
-end
-
-local hitboxes_ref = get_reference("RAGE", "Aimbot", "Target hitbox")
+-- Костыль через select(1, ...) — берем строго первый аргумент из тех, что вернет чит
+local hitboxes_ref = select(1, ui.reference("RAGE", "Aimbot", "Target hitbox"))
 
 local function on_setup_command(cmd)
     if not ui.get(menu_reference) then return end
-    if not hitboxes_ref then return end
 
     local me = entity.get_local_player()
     if me == nil or not entity.is_alive(me) then return end
@@ -55,8 +43,10 @@ local function on_setup_command(cmd)
             hb_to_set = {"Head", "Chest", "Stomach", "Feet", "Legs"}
         end
 
-        
-        ui.set(hitboxes_ref, hb_to_set)
+        -- Вызываем set только если ссылка валидна
+        if hitboxes_ref then
+            ui.set(hitboxes_ref, unpack(hb_to_set))
+        end
 
         ::skip::
     end
