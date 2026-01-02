@@ -1,4 +1,3 @@
-local ui = require("gamesense/pui")
 local vector = require("vector")
 
 local hellpineind = ui.new_checkbox("LUA", "B", "ind")
