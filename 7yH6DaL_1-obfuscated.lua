@@ -1678,7 +1678,7 @@ client.set_event_callback("paint", on_paint_lethal)
 local ui_enable = ui.new_checkbox("LUA", "A", "Wireframe Onshot")
 local ui_mode = ui.new_combobox("LUA", "A", "Color Mode", "Static", "Rainbow")
 local ui_color = ui.new_color_picker("LUA", "A", "Static Color", 255, 50, 50, 255)
-local ui_duration = ui.new_slider("LUA", "A", "Duration (sec)", 1, 10, 4, true, "s", 0.1)
+local ui_duration = ui.new_slider("LUA", "A", "Duration", 1, 10, 4, true, "s", 0.1)
 local ui_speed = ui.new_slider("LUA", "A", "Rainbow Speed", 1, 30, 10, true, "", 1)
 
 local killed_players = {}
