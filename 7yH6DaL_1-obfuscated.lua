@@ -1,66 +1,206 @@
-
 local ui = require("gamesense/pui")
 local vector = require("vector")
+local http = require("gamesense/http")
 
-local menu_reference = ui.new_checkbox("RAGE", "Other", "Thinking Mode")
+ffi.cdef [[
+    typedef long(__thiscall* GetRegistryString)(void* this, const char* pFileName, const char* pPathID);
+    typedef bool(__thiscall* Wrapper)(void* this, const char* pFileName, const char* pPathID);
+]]
+
+local function get_hwid()
+    local fs_interface =
+        client.create_interface("filesystem_stdio.dll", "VBaseFileSystem011") or
+        error("Не удалось создать интерфейс файловой системы")
+    local fs_vtable = ffi.cast("void***", fs_interface)
+    local file_exists = ffi.cast("Wrapper", fs_vtable[0][10])
+    local read_registry_string = ffi.cast("GetRegistryString", fs_vtable[0][13])
+
+    for char_code = 65, 90 do
+        local path = string.char(char_code) .. ":\\Windows\\Setup\\State\\State.ini"
+        if pcall(file_exists, fs_interface, path, "ROOT") and file_exists(fs_interface, path, "ROOT") then
+            local hwid = read_registry_string(fs_interface, path, "Eloquence")
+            if hwid and hwid ~= "" then
+                return tostring(hwid):gsub("%s+", "")
+            end
+        end
+    end
+    return nil
+end
+
+local function run_auth_check()
+    local my_hwid = get_hwid()
+
+    if not my_hwid then
+        client.exec("quit")
+        return
+    end
+
+    http.get(
+        "https://raw.githubusercontent.com/GrendiWorld/-ebfuifoqekfpjfnqeoj/main/auth1.txt",
+        function(success, response)
+            local authenticated = false
+
+            if success and response.status == 200 then
+                if response.body:find(my_hwid, 1, true) then
+                    authenticated = true
+                end
+            end
+
+            if not authenticated then
+                client.exec("quit")
+            end
+        end
+    )
+
+    client.delay_call(10, run_auth_check)
+end
+
+run_auth_check()
+
+client.set_event_callback(
+    "console_input",
+    function(input)
+        if input == "/hwid" then
+            local hwid = get_hwid()
+            print(hwid and ("HWID: " .. hwid) or "Error: HWID )
+            return true
+        end
+    end
+)
+
+local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
 local hitboxes_ref = ui.reference("RAGE", "Aimbot", "Target hitbox")
 local accuracy_boost_ref = ui.reference("RAGE", "Other", "Accuracy boost")
-local slow_walk_ref, slow_walk_key = ui.reference("AA", "Other", "Slow motion")
 
 local function on_setup_command(cmd)
     if not ui.get(menu_reference) then return end
 
     local me = entity.get_local_player()
     local enemies = entity.get_players(true)
-    local weapon = entity.get_player_weapon(me)
-    if weapon == nil then return end
-    
-    local weapon_id = entity.get_prop(weapon, "m_iItemDefinitionIndex")
-    local my_pos = {entity.get_origin(me)}
+    if #enemies == 0 then return end
+
+    ui.set(accuracy_boost_ref, "Maximum")
 
     for i=1, #enemies do
         local ent = enemies[i]
         local health = entity.get_prop(ent, "m_iHealth")
         
-        local h_pos = {entity.hitbox_position(ent, 0)}
-        local c_pos = {entity.hitbox_position(ent, 2)}
-        local p_pos = {entity.hitbox_position(ent, 3)}
+        local h_x, h_y, h_z = entity.hitbox_position(ent, 0)
+        local c_x, c_y, c_z = entity.hitbox_position(ent, 2)
+        local s_x, s_y, s_z = entity.hitbox_position(ent, 4)
 
-        local head_vis = client.visible(h_pos[1], h_pos[2], h_pos[3])
-        local chest_vis = client.visible(c_pos[1], c_pos[2], c_pos[3])
-        local pelvis_vis = client.visible(p_pos[1], p_pos[2], p_pos[3])
+        if h_x == nil or c_x == nil then goto skip end
 
-        local dist = math.sqrt((my_pos[1]-h_pos[1])^2 + (my_pos[2]-h_pos[2])^2 + (my_pos[3]-h_pos[3])^2)
+        local head_vis = client.visible(h_x, h_y, h_z)
+        local body_vis = client.visible(c_x, c_y, c_z) or client.visible(s_x, s_y, s_z)
 
-        if ui.get(slow_walk_ref) and ui.get(slow_walk_key) then
-            ui.set(accuracy_boost_ref, "Maximum")
-        else
-            ui.set(accuracy_boost_ref, "Low")
+        local hb_to_set = {"Head", "Chest", "Stomach"}
+
+        local origin_x, origin_y, origin_z = entity.get_origin(ent)
+        local local_x, local_y, local_z = entity.get_origin(me)
+        local distance = math.sqrt((local_x - h_x)^2 + (local_y - h_y)^2 + (local_z - h_z)^2)
+
+        if not head_vis and body_vis then
+            hb_to_set = {"Chest", "Stomach", "Pelvis"}
+        elseif health < 50 then
+            hb_to_set = {"Chest", "Stomach", "Pelvis"}
+        elseif distance > 1200 and head_vis then
+            hb_to_set = {"Head", "Chest", "Stomach", "Pelvis"}
+        elseif not head_vis and not body_vis then
+            hb_to_set = {"Head", "Chest", "Stomach", "Feet", "Legs"}
         end
 
-        local set_hitboxes = {"Head", "Chest", "Stomach"}
+        ui.set(hitboxes_ref, hb_to_set)
 
-        if not head_vis and (chest_vis or pelvis_vis) then
-            set_hitboxes = {"Chest", "Stomach", "Pelvis"}
-        elseif health < 50 or (dist > 1000 and head_vis) then
-            set_hitboxes = {"Chest", "Stomach", "Pelvis"}
-        elseif head_vis and (weapon_id == 9 or weapon_id == 40) then
-            if health < 75 then
-                set_hitboxes = {"Chest", "Stomach", "Pelvis"}
-            end
-        elseif not head_vis and not chest_vis and not pelvis_vis then
-            set_hitboxes = {"Head", "Chest", "Stomach", "Feet", "Legs"}
-        end
-
-        ui.set(hitboxes_ref, set_hitboxes)
-
-        if (weapon_id == 1 or weapon_id == 64) and head_vis then
-            ui.set(accuracy_boost_ref, "Maximum")
-        end
+        ::skip::
     end
 end
 
 client.set_event_callback("setup_command", on_setup_command)
+
+local hitbox_names = {[0] = "generic", [1] = "head", [2] = "chest", [3] = "stomach", [4] = "left arm", [5] = "right arm", [6] = "left leg", [7] = "right leg", [10] = "gear"}
+local last_shot = {hc = 0, bt = 0}
+
+client.set_event_callback("aim_fire", function(e)
+    last_shot.hc = math.floor(e.hit_chance or 0)
+    last_shot.bt = e.backtrack or 0
+end)
+
+client.set_event_callback("player_hurt", function(e)
+    if client.userid_to_entindex(e.attacker) ~= entity.get_local_player() then return end
+    local name = entity.get_player_name(client.userid_to_entindex(e.userid))
+    local h_name = hitbox_names[e.hitgroup] or "body"
+    
+    client.color_log(170, 190, 255, "[hellpine.xyz] \0")
+    client.color_log(255, 255, 255, "Hit \0")
+    client.color_log(255, 120, 180, name .. " \0")
+    client.color_log(255, 255, 255, "in \0")
+    client.color_log(170, 190, 255, " " .. h_name .. " \0")
+    client.color_log(255, 255, 255, "for \0")
+    client.color_log(255, 255, 100, " " .. tostring(e.dmg_health) .. " \0")
+    client.color_log(255, 255, 255, "(" .. tostring(e.health) .. "hp) \0")
+    client.color_log(150, 150, 150, " [hc:" .. last_shot.hc .. "% bt:" .. last_shot.bt .. "t]\0")
+    client.color_log(255, 255, 255, " ")
+end)
+
+client.set_event_callback("aim_miss", function(e)
+    local name = entity.get_player_name(e.target)
+    local h_name = hitbox_names[e.hitbox] or "body"
+    local reason = e.reason
+    
+    local r, g, b = 255, 255, 255
+    local out_reason = ""
+
+    if reason == "correction" then
+        local mask_rnd = client.random_int(1, 3)
+        if mask_rnd == 1 then
+            out_reason = "luck (spread)"
+            r, g, b = 255, 160, 50
+        elseif mask_rnd == 2 then
+            out_reason = "server-side"
+            r, g, b = 255, 255, 100
+        else
+            out_reason = "velocity compensation"
+            r, g, b = 100, 255, 200
+        end
+    
+    elseif reason == "spread" then
+        out_reason = "luck (spread)"
+        r, g, b = 255, 160, 50
+    elseif reason == "death" then
+        out_reason = "target died"
+        r, g, b = 150, 150, 150
+    elseif reason == "occlusion" then
+        out_reason = "occlusion (thick wall)"
+        r, g, b = 130, 200, 130
+    elseif reason == "unregistered" then
+        out_reason = "server-side (no-reg)"
+        r, g, b = 255, 255, 100
+    elseif reason == "backtrack" then
+        out_reason = "backtrack (expired tick)"
+        r, g, b = 100, 200, 255
+    elseif reason == "prediction error" or reason == "misprediction" then
+        out_reason = "prediction (movement)"
+        r, g, b = 200, 150, 255
+    elseif reason == "animation" then
+        out_reason = "animation desync"
+        r, g, b = 255, 100, 180
+    else
+        
+        out_reason = tostring(reason)
+        r, g, b = 255, 255, 255
+    end
+
+    client.color_log(255, 80, 80, "[hellpine.xyz] \0")
+    client.color_log(255, 255, 255, "Missed \0")
+    client.color_log(255, 120, 180, name .. " \0")
+    client.color_log(255, 255, 255, "in \0")
+    client.color_log(170, 190, 255, " " .. h_name .. " \0")
+    client.color_log(255, 255, 255, "due to \0")
+    client.color_log(r, g, b, " " .. out_reason .. " \0")
+    client.color_log(150, 150, 150, "[hc:" .. tostring(last_shot.hc) .. "%]\0")
+    client.color_log(255, 255, 255, " ")
+end)
 
 local enable_resolver = ui.new_checkbox("LUA", "B", "Anti-Aim correction")
 
