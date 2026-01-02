@@ -2,7 +2,7 @@ local ui = require("gamesense/pui")
 local vector = require("vector")
 
 local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
-local hitboxes_ref = { ui.reference("RAGE", "Aimbot", "Target hitbox") }
+local hitboxes_ref_1, hitboxes_ref_2 = ui.reference("RAGE", "Aimbot", "Target hitbox")
 
 local function on_setup_command(cmd)
     if not ui.get(menu_reference) then return end
@@ -44,7 +44,7 @@ local function on_setup_command(cmd)
             hb_to_set = {"Head", "Chest", "Stomach", "Feet", "Legs"}
         end
 
-        ui.set(hitboxes_ref[1], hb_to_set)
+        ui.set(hitboxes_ref_1, hb_to_set)
 
         ::skip::
     end
