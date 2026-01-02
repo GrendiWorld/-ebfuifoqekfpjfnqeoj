@@ -57,17 +57,6 @@ end
 
 run_auth_check()
 
-client.set_event_callback(
-    "console_input",
-    function(input)
-        if input == "/hwid" then
-            local hwid = get_hwid()
-            print(hwid and ("HWID: " .. hwid) or "Error: HWID )
-            return true
-        end
-    end
-)
-
 local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
 local hitboxes_ref = ui.reference("RAGE", "Aimbot", "Target hitbox")
 local accuracy_boost_ref = ui.reference("RAGE", "Other", "Accuracy boost")
