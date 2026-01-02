@@ -3,8 +3,22 @@ local vector = require("vector")
 
 local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
 
+
+local function get_reference(tab, container, name)
+    local success, results = pcall(function() 
+        return {ui.reference(tab, container, name)} 
+    end)
+    if success and results[1] then 
+        return results[1] 
+    end
+    return nil
+end
+
+local hitboxes_ref = get_reference("RAGE", "Aimbot", "Target hitbox")
+
 local function on_setup_command(cmd)
     if not ui.get(menu_reference) then return end
+    if not hitboxes_ref then return end
 
     local me = entity.get_local_player()
     if me == nil or not entity.is_alive(me) then return end
@@ -12,16 +26,11 @@ local function on_setup_command(cmd)
     local enemies = entity.get_players(true)
     if #enemies == 0 then return end
 
-    local raw_ref = ui.reference("RAGE", "Aimbot", "Target hitbox")
-    local hitboxes_ref = tonumber(raw_ref)
-
     for i=1, #enemies do
         local ent = enemies[i]
-        
         if not entity.is_alive(ent) or entity.is_dormant(ent) then goto skip end
 
         local health = entity.get_prop(ent, "m_iHealth")
-        
         local h_x, h_y, h_z = entity.hitbox_position(ent, 0)
         local c_x, c_y, c_z = entity.hitbox_position(ent, 2)
         local s_x, s_y, s_z = entity.hitbox_position(ent, 4)
@@ -46,9 +55,8 @@ local function on_setup_command(cmd)
             hb_to_set = {"Head", "Chest", "Stomach", "Feet", "Legs"}
         end
 
-        if hitboxes_ref ~= nil then
-            ui.set(hitboxes_ref, hb_to_set)
-        end
+        
+        ui.set(hitboxes_ref, hb_to_set)
 
         ::skip::
     end
