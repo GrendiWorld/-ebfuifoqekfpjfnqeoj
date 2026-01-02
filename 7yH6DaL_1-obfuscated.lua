@@ -1,6 +1,19 @@
 local ui = require("gamesense/pui")
 local vector = require("vector")
 
+local hellpineind = ui.new_checkbox("LUA", "B", "ind")
+
+local function paint()
+    if not ui.get(hellpineind) then return end
+
+    local pulse = math.sin(globals.curtime() * 1.5) 
+    local dynamic_alpha = math.floor(20 + (pulse + 1) * 0.5 * (255 - 20))
+
+    renderer.indicator(255, 255, 255, dynamic_alpha, "HELLPINE")
+end
+
+client.set_event_callback("paint", paint)
+
 local hitbox_names = {[0] = "generic", [1] = "head", [2] = "chest", [3] = "stomach", [4] = "left arm", [5] = "right arm", [6] = "left leg", [7] = "right leg", [10] = "gear"}
 local last_shot = {hc = 0, bt = 0}
 
