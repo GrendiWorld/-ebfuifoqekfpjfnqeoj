@@ -3,7 +3,6 @@ local vector = require("vector")
 
 local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
 local hitboxes_ref = ui.reference("RAGE", "Aimbot", "Target hitbox")
-local accuracy_boost_ref = ui.reference("RAGE", "Other", "Accuracy boost")
 
 local function on_setup_command(cmd)
     if not ui.get(menu_reference) then return end
@@ -11,8 +10,6 @@ local function on_setup_command(cmd)
     local me = entity.get_local_player()
     local enemies = entity.get_players(true)
     if #enemies == 0 then return end
-
-    ui.set(accuracy_boost_ref, "Maximum")
 
     for i=1, #enemies do
         local ent = enemies[i]
