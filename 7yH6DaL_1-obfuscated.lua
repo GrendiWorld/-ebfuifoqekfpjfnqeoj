@@ -2,7 +2,6 @@ local ui = require("gamesense/pui")
 local vector = require("vector")
 
 local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
-local hitboxes_ref_1, hitboxes_ref_2 = ui.reference("RAGE", "Aimbot", "Target hitbox")
 
 local function on_setup_command(cmd)
     if not ui.get(menu_reference) then return end
@@ -12,6 +11,9 @@ local function on_setup_command(cmd)
 
     local enemies = entity.get_players(true)
     if #enemies == 0 then return end
+
+    local raw_ref = ui.reference("RAGE", "Aimbot", "Target hitbox")
+    local hitboxes_ref = tonumber(raw_ref)
 
     for i=1, #enemies do
         local ent = enemies[i]
@@ -44,7 +46,9 @@ local function on_setup_command(cmd)
             hb_to_set = {"Head", "Chest", "Stomach", "Feet", "Legs"}
         end
 
-        ui.set(hitboxes_ref_1, hb_to_set)
+        if hitboxes_ref ~= nil then
+            ui.set(hitboxes_ref, hb_to_set)
+        end
 
         ::skip::
     end
