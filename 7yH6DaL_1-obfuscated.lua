@@ -206,7 +206,7 @@ client.set_event_callback("setup_command", on_setup_command)
 
 local globals = globals or {}
 
-local enable_resolver = ui.new_checkbox("RAGE", "Other", "Resolver")
+local enable_resolver = ui.new_checkbox("LUA", "B", "Resolver")
 
 globals.config = function(key)
     if key == "legsinair" then
