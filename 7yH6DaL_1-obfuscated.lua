@@ -100,7 +100,12 @@ end)
 
 local menu_reference = ui.new_checkbox("LUA", "A", "Thinking Mode")
 
-local hitboxes_ref = select(1, ui.reference("RAGE", "Aimbot", "Target hitbox"))
+local hitbox_ref = ui.reference("RAGE", "Aimbot", "Target hitbox")
+local multipoint_ref = ui.reference("RAGE", "Aimbot", "Multi-point")
+local mp_scale_ref = ui.reference("RAGE", "Aimbot", "Multi-point scale")
+local prefer_safe_ref = ui.reference("RAGE", "Aimbot", "Prefer safe point")
+local min_damage_ref = ui.reference("RAGE", "Aimbot", "Minimum damage")
+local force_sp_ref = ui.reference("RAGE", "Aimbot", "Force safe point")
 
 local function on_setup_command(cmd)
     if not ui.get(menu_reference) then return end
@@ -111,49 +116,97 @@ local function on_setup_command(cmd)
     local enemies = entity.get_players(true)
     if #enemies == 0 then return end
 
-    for i=1, #enemies do
+    local valid_enemies = {}
+    local lx, ly, lz = entity.get_origin(me)
+
+    for i = 1, #enemies do
         local ent = enemies[i]
-        if not entity.is_alive(ent) or entity.is_dormant(ent) then goto skip end
-
-        local health = entity.get_prop(ent, "m_iHealth")
-        local h_x, h_y, h_z = entity.hitbox_position(ent, 0)
-        local c_x, c_y, c_z = entity.hitbox_position(ent, 2)
-        local s_x, s_y, s_z = entity.hitbox_position(ent, 4)
-
-        if h_x == nil or c_x == nil then goto skip end
-
-        local head_vis = client.visible(h_x, h_y, h_z)
-        local body_vis = client.visible(c_x, c_y, c_z) or client.visible(s_x, s_y, s_z)
-
-        local hb_to_set = {"Head", "Chest", "Stomach"}
-
-        local lx, ly, lz = entity.get_origin(me)
-        local distance = math.sqrt((lx - h_x)^2 + (ly - h_y)^2 + (lz - h_z)^2)
-
-        if not head_vis and body_vis then
-            hb_to_set = {"Chest", "Stomach", "Pelvis"}
-        elseif health < 50 then
-            hb_to_set = {"Chest", "Stomach", "Pelvis"}
-        elseif distance > 1200 and head_vis then
-            hb_to_set = {"Head", "Chest", "Stomach", "Pelvis"}
-        elseif not head_vis and not body_vis then
-            hb_to_set = {"Head", "Chest", "Stomach", "Feet", "Legs"}
+        if entity.is_alive(ent) and not entity.is_dormant(ent) then
+            valid_enemies[#valid_enemies + 1] = ent
         end
-
-        
-        if hitboxes_ref then
-            ui.set(hitboxes_ref, unpack(hb_to_set))
-        end
-
-        ::skip::
     end
-end
-        
 
+    if #valid_enemies == 0 then return end
+
+    local closest_ent = nil
+    local min_dist = math.huge
+
+    for i = 1, #valid_enemies do
+        local ent = valid_enemies[i]
+        local ex, ey, ez = entity.get_origin(ent)
+        local dist = ((lx - ex)^2 + (ly - ey)^2 + (lz - ez)^2)^0.5
+        if dist < min_dist then
+            min_dist = dist
+            closest_ent = ent
+        end
+    end
+
+    local ent = closest_ent
+    local health = entity.get_prop(ent, "m_iHealth")
+
+    local head_x, head_y, head_z = entity.hitbox_position(ent, 0)
+    local chest_x, chest_y, chest_z = entity.hitbox_position(ent, 2)
+    local stomach_x, stomach_y, stomach_z = entity.hitbox_position(ent, 4)
+    local pelvis_x, pelvis_y, pelvis_z = entity.hitbox_position(ent, 5)
+
+    if head_x == nil then return end
+
+    local head_vis = client.visible(head_x, head_y, head_z)
+    local body_vis = client.visible(chest_x, chest_y, chest_z) or client.visible(stomach_x, stomach_y, stomach_z) or client.visible(pelvis_x, pelvis_y, pelvis_z)
+
+    local vel_x, vel_y = entity.get_prop(ent, "m_vecVelocity")
+    local speed = (vel_x^2 + vel_y^2)^0.5
+
+    local hitboxes = {"Head", "Chest"}
+    local mp_hitboxes = {"Head", "Chest"}
+    local mp_scale = 60
+    local prefer_safe = true
+    local min_damage = 35
+    local force_safe = false
+
+    if speed > 290 or health < 40 or (not head_vis and body_vis) then
+        hitboxes = {"Chest", "Stomach", "Pelvis"}
+        mp_hitboxes = {"Chest", "Stomach", "Pelvis"}
+        mp_scale = 82
+        prefer_safe = false
+        min_damage = math.max(health + 8, 40)
+        force_safe = false
+    elseif min_dist > 1100 and head_vis then
+        hitboxes = {"Head", "Chest", "Stomach"}
+        mp_hitboxes = {"Head"}
+        mp_scale = 52
+        prefer_safe = true
+        min_damage = 55
+        force_safe = true
+    elseif not head_vis and not body_vis then
+        hitboxes = {"Chest", "Stomach", "Pelvis", "Legs"}
+        mp_hitboxes = {"Chest", "Stomach"}
+        mp_scale = 75
+        prefer_safe = false
+        min_damage = 25
+        force_safe = false
+    elseif speed > 180 then
+        hitboxes = {"Chest", "Stomach"}
+        mp_hitboxes = {"Chest", "Stomach", "Pelvis"}
+        mp_scale = 78
+        prefer_safe = true
+        min_damage = 40
+    end
+
+    ui.set(hitbox_ref, unpack(hitboxes))
+    ui.set(multipoint_ref, unpack(mp_hitboxes))
+    ui.set(mp_scale_ref, mp_scale)
+    ui.set(prefer_safe_ref, prefer_safe)
+    ui.set(min_damage_ref, min_damage)
+    ui.set(force_sp_ref, force_safe)
+end
+
+client.set_event_callback("setup_command", on_setup_command)
+        
 
 local globals = globals or {}
 
-local enable_resolver = ui.new_checkbox("LUA", "B", "Resolver")
+local enable_resolver = ui.new_checkbox("RAGE", "Other", "Resolver")
 
 globals.config = function(key)
     if key == "legsinair" then
@@ -798,6 +851,74 @@ local function GetHitboxPos(player, mat, hitbox_id)
     return (min + max) * 0.5
 end
 
+local function is_visible(pos)
+    local local_player = entity.get_local_player()
+    if not local_player then return false end
+    local eye = entity.hitbox_position(local_player, 0)
+    local frac, hit_ent = client.trace_line(local_player, eye.x, eye.y, eye.z, pos.x, pos.y, pos.z)
+    return hit_ent == self.player and frac > 0.95
+end
+
+function resolver:detect_side()
+    local backward_yaw = get_backward_side(self.player)
+    local forward = angle_to_vec(backward_yaw)
+    local right = angle_to_vec(backward_yaw + 90)
+    local head_pos = entity.hitbox_position(self.player, 0)
+    local src = head_pos
+    local dst = src + forward * 384
+    local tr = client.trace_line(self.player, src.x, src.y, src.z, dst.x, dst.y, dst.z)
+    local back_two = tr.fraction * 384
+    local src_right = src + right * 35
+    local dst_right = dst + right * 35
+    tr = client.trace_line(self.player, src_right.x, src_right.y, src_right.z, dst_right.x, dst_right.y, dst_right.z)
+    local right_two = tr.fraction * 384
+    local src_left = src - right * 35
+    local dst_left = dst - right * 35
+    tr = client.trace_line(self.player, src_left.x, src_left.y, src_left.z, dst_left.x, dst_left.y, dst_left.z)
+    local left_two = tr.fraction * 384
+    if left_two > right_two then
+        self.player_record.side = globals.LEFT1
+    elseif right_two > left_two then
+        self.player_record.side = globals.RIGHT1
+    else
+        self:get_side_trace()
+    end
+    self.player_record.type = TRACE
+end
+
+function resolver:get_side_trace()
+    local trace = false
+    local m_side = false
+    if globals.curtime() - self.lock_side > 2 then
+        local head_left = GetHitboxPos(self.player, self.player_record.matrixes_data.second, 0)
+        local head_right = GetHitboxPos(self.player, self.player_record.matrixes_data.first, 0)
+        local left_visible = is_visible(head_left)
+        local right_visible = is_visible(head_right)
+        if left_visible ~= right_visible then
+            trace = true
+            m_side = right_visible
+        else
+            local origin = entity.get_prop(self.player, "m_vecOrigin") or vector(0,0,0)
+            local view_offset = entity.get_prop(self.player, "m_vecViewOffset") or vector(0,0,64)
+            local eye_pos = origin + view_offset
+            local dist_left = (eye_pos - head_left):length()
+            local dist_right = (eye_pos - head_right):length()
+            if math.abs(dist_left - dist_right) > 1 then
+                m_side = dist_left > dist_right
+            end
+        end
+        self.lock_side = globals.curtime()
+    else
+        trace = true
+    end
+    if m_side then
+        self.player_record.side = globals.RIGHT1
+    else
+        self.player_record.side = globals.LEFT1
+    end
+    self.player_record.type = trace and TRACE or DIRECTIONAL
+end
+
 function resolver:resolve_yaw()
     if self.player == nil or not entity.is_alive(self.player) or self.player_record == nil then return end
 
@@ -816,7 +937,7 @@ function resolver:resolve_yaw()
 
     self.fake = true
 
-    local cur_layer = self.player_record.layers[3]
+    local cur_layer = self.player_record.layers[4]
 
     if cur_layer.weight <= 0.1 then
         local current_angle = eye_yaw
@@ -857,30 +978,9 @@ function resolver:resolve_yaw()
         return
     end
 
-    if mode == MOVING then
-        self:get_side_standing()
-        self.player_record.side = self.player_record.curSide
-        self.player_record.type = DIRECTIONAL
-        return
-    end
-
-    if mode == SLOW_WALKING then
-        if self:is_slow_walking() then
-            self.player_record.type = LBY
-            local lby_delta = angle_diff(eye_yaw, lby)
-            self.player_record.side = lby_delta > 0 and globals.LEFT1 or globals.RIGHT1
-            return
-        else
-            self:get_side_standing()
-            self.player_record.side = self.player_record.curSide
-            self.player_record.type = DIRECTIONAL
-            return
-        end
-    end
-
     if mode == STANDING then
-        local cur_layer = self.player_record.layers[3]  -- assuming layer 3 for desync
-        local prev_layer = self.prev_record and self.prev_record.layers[3] or cur_layer
+        local cur_layer = self.player_record.layers[4]  
+        local prev_layer = self.prev_record and self.prev_record.layers[4] or cur_layer
 
         if self:is_breaking_lby(cur_layer, prev_layer) then
             self.player_record.type = LBY
@@ -910,27 +1010,92 @@ function resolver:resolve_yaw()
             return
         end
 
-        -- freestand trace
-        local head_pos = entity.hitbox_position(self.player, 0)
-        local eye_yaw = entity.get_prop(self.player, "m_angEyeAngles").y or 0
-        local left_vec = angle_to_vec(eye_yaw + 90) * 100
-        local right_vec = angle_to_vec(eye_yaw - 90) * 100
-        local left_end = head_pos + left_vec
-        local right_end = head_pos + right_vec
+        self:detect_side()
+        return
+    end
 
-        local left_fraction, _, _, _, _ = client.trace_line(self.player, head_pos.x, head_pos.y, head_pos.z + 5, left_end.x, left_end.y, left_end.z + 5)
-        local right_fraction, _, _, _, _ = client.trace_line(self.player, head_pos.x, head_pos.y, head_pos.z + 5, right_end.x, right_end.y, right_end.z + 5)
-
-        if math.abs(left_fraction - right_fraction) > 0.25 then
-            self.player_record.type = TRACE
-            self.player_record.side = left_fraction > right_fraction and globals.LEFT1 or globals.RIGHT1
+    if mode == MOVING or mode == SLOW_WALKING then
+        if self.prev_record == nil then
+            self:get_side_standing()
+            self.player_record.side = self.player_record.curSide
+            self.player_record.type = DIRECTIONAL
             return
         end
 
-        -- default standing
-        self:get_side_standing()
-        self.player_record.side = self.player_record.curSide
-        self.player_record.type = ANIMATION
+        local cur_layer6 = self.player_record.layers[7]
+        local cur_layer6_weight = cur_layer6.weight
+        if cur_layer6_weight <= 0.0099999998 then
+            if math.abs(angle_diff(eye_yaw, self.prev_record.angles.y)) > 35 then
+                self:detect_side()
+            end
+            return
+        end
+
+        local cur_layer11 = self.player_record.layers[12]
+        local cur_layer11_weight = cur_layer11.weight
+        local cur_layer12_weight = math.floor(self.player_record.layers[13].weight * 1000)
+        local cur_layer11_weight_valid = cur_layer11_weight > 0 and cur_layer11_weight < 1
+        local prev_layer11_weight_valid = self.prev_record.layers[12].weight > 0 and self.prev_record.layers[12].weight < 1
+        local not_to_diff_vel_angle = false
+        if self.prev_record.layers[7].weight > 0.0099999998 then
+            local cur_vel_angle = math.deg(math.atan2(self.player_record.velocity.y, self.player_record.velocity.x))
+            local prev_vel_angle = math.deg(math.atan2(self.prev_record.velocity.y, self.prev_record.velocity.x))
+            not_to_diff_vel_angle = math.abs(angle_diff(cur_vel_angle, prev_vel_angle)) < 10
+        end
+        local prev_layer6_weight = math.floor(self.prev_record.layers[7].weight * 1000)
+        local not_accelerating = math.floor(cur_layer6_weight * 1000) == prev_layer6_weight and cur_layer12_weight == 0
+        local v74 = cur_layer11_weight_valid and (cur_layer12_weight == 0 or (prev_layer11_weight_valid and not_to_diff_vel_angle))
+        local m_accelerating = false
+        if not not_accelerating and not cur_layer11_weight_valid then
+            m_accelerating = false
+        else
+            m_accelerating = true
+            if not not_accelerating then
+                if not v74 then
+                    if math.abs(angle_diff(eye_yaw, self.prev_record.angles.y)) > 35 then
+                        self:detect_side()
+                    end
+                    return
+                end
+            end
+        end
+        if not v74 then
+            if math.abs(angle_diff(eye_yaw, self.prev_record.angles.y)) > 35 then
+                self:detect_side()
+            end
+            return
+        end
+
+        local delta1 = math.abs(cur_layer6.playback_rate - self.resolver_layers[3][7].playback_rate)
+        local delta2 = math.abs(cur_layer6.playback_rate - self.resolver_layers[2][7].playback_rate)
+        if math.floor(delta1 * 10000) == math.floor(delta2 * 10000) then
+            if math.abs(angle_diff(eye_yaw, self.prev_record.angles.y)) > 35 then
+                self:detect_side()
+            end
+            return
+        end
+        local delta0 = math.abs(cur_layer6.playback_rate - self.resolver_layers[1][7].playback_rate)
+        local best_delta = math.min(delta0, delta1, delta2)
+        if math.floor(best_delta * 10000) == math.floor(delta0 * 10000) then
+            if math.abs(angle_diff(eye_yaw, self.prev_record.angles.y)) > 35 then
+                self:detect_side()
+            end
+            return
+        end
+        if best_delta == delta2 then
+            self.player_record.side = globals.LEFT1
+            self.player_record.type = ANIMATION
+            return
+        end
+        if best_delta == delta1 then
+            self.player_record.side = globals.RIGHT1
+            self.player_record.type = ANIMATION
+            return
+        end
+        if math.abs(angle_diff(eye_yaw, self.prev_record.angles.y)) > 35 then
+            self:detect_side()
+        end
+        return
     end
 end
 
@@ -964,8 +1129,8 @@ local FREESTANDING = 4
 local NO_MODE = 5
 
 local NO_SIDE = 0
-local LEFT1 = 1
-local RIGHT1 = 2
+local LEFT1 = -1
+local RIGHT1 = 1
 local LOW_LEFT = -2
 local LOW_RIGHT = 2
 
