@@ -148,10 +148,476 @@ local function on_setup_command(cmd)
         ::skip::
     end
 end
+        
 
 
-local enable_resolver = ui.new_checkbox("LUA", "B", "Anti-Aim correction")
+local globals = globals or {}
 
+local enable_resolver = ui.new_checkbox("LUA", "B", "Resolver")
+
+globals.config = function(key)
+    if key == "legsinair" then
+        return false
+    end
+    if key == "rage_enabled" then
+        return true
+    end
+    if key == "rage_fakelag_limit" then
+        return 14
+    end
+    return false
+end
+
+globals.fakelag_condition = function()
+    return false
+end
+
+globals.keybind_state = function(key)
+    return false
+end
+
+globals.reset_state = function(state)
+    -- stub
+end
+
+globals.create_state = function(player)
+    return {}  -- stub animstate
+end
+
+globals.update_state = function(state, angles)
+    -- stub
+end
+
+globals.BONE_USED_BY_HITBOX = 0x00000100  -- example value
+
+globals.BONE_USED_BY_ANYTHING = 0x0007FF00  -- example value
+
+globals.prediction_matrix = {}  -- stub
+
+globals.fake_matrix = {}  -- stub
+
+globals.antiaim_condition = function(cmd)
+    return false
+end
+
+globals.get_command = function()
+    return {}  -- stub
+end
+
+globals.LEFT1 = -1
+
+globals.RIGHT1 = 1
+
+globals.time_to_ticks = function(time)
+    return math.floor(time / globals.tickinterval() + 0.5)
+end
+
+globals.calculate_angle = function(from, to)
+    local delta = to - from
+    local pitch = math.deg(math.atan(delta.z / delta:length2d()))
+    local yaw = math.deg(math.atan2(delta.y, delta.x))
+    return vector(pitch, yaw, 0)
+end
+
+globals.extrapolate = function(player, origin, velocity, flags, on_ground)
+    -- stub, do nothing
+end
+
+globals.MASK_PLAYERSOLID = 33636363  -- example value
+
+globals.CONTENTS_MONSTER = 33554432  -- example value
+
+globals.valid_player = function(e, check_team)
+    return entity.is_enemy(e)
+end
+
+globals.fired_shots = {}
+globals.missed_shots = {}
+for i=1,65 do globals.fired_shots[i] = 0 globals.missed_shots[i] = 0 end
+
+globals.FL_ONGROUND = 1
+
+globals.get_bone_merge = function(player)
+    return nil
+end
+
+globals.get_bone_merge_follow = function(merge)
+    return nil
+end
+
+globals.bone_merge_copy_to_follow = function(merge, pos, rot, mask, bones, quats)
+    -- stub
+end
+
+globals.bone_merge_copy_from_follow = function(merge, pos, rot, mask, bones, quats)
+    -- stub
+end
+
+globals.CBoneSetup = {}
+globals.CBoneSetup.__index = globals.CBoneSetup
+
+function globals.CBoneSetup:new(hdr, mask, poses)
+    local obj = {}
+    setmetatable(obj, self)
+    -- stub
+    return obj
+end
+
+function globals.CBoneSetup:InitPose(bones, quats, hdr)
+    -- stub
+end
+
+function globals.CBoneSetup:CalcAutoplaySequences(bones, quats, time, ik)
+    -- stub
+end
+
+function globals.CBoneSetup:AccumulatePose(bones, quats, seq, cycle, weight, time, ik)
+    -- stub
+end
+
+function globals.CBoneSetup:CalcBoneAdj(bones, quats, poses, mask)
+    -- stub
+end
+
+globals.CIKContext = {}
+globals.CIKContext.__index = globals.CIKContext
+
+function globals.CIKContext:new()
+    local obj = {}
+    setmetatable(obj, self)
+    -- stub
+    return obj
+end
+
+function globals.CIKContext:Init(hdr, angles, origin, time, frame, mask)
+    -- stub
+end
+
+function globals.CIKContext:UpdateTargets(pos, rot, mat, computed)
+    -- stub
+end
+
+function globals.CIKContext:SolveDependencies(pos, rot, mat, computed)
+    -- stub
+end
+
+function globals.CIKContext:Destructor()
+    -- stub
+end
+
+globals.attachment_helper = function(animating, hdr)
+    -- stub
+end
+
+globals.interpolation = function()
+    return cvar.cl_interp_ratio:get_float() / cvar.cl_updaterate:get_float()
+end
+
+globals.fixed_tickbase = globals.curtime()  -- stub
+
+globals.fakeducking = false
+
+globals.maxclients = function()
+    return 64
+end
+
+local vector_mt = {
+    __sub = function(a, b)
+        return vector(a.x - b.x, a.y - b.y, a.z - b.z)
+    end,
+}
+
+vector_mt.__index = vector_mt
+
+function vector_mt.length_sq(self)
+    return self.x * self.x + self.y * self.y + self.z * self.z
+end
+
+function vector_mt.length2d(self)
+    return math.sqrt(self.x * self.x + self.y * self.y)
+end
+
+local function vector(x, y, z)
+    local v = {x = x or 0, y = y or 0, z = z or 0}
+    setmetatable(v, vector_mt)
+    return v
+end
+
+local local_animations = {}
+local_animations.__index = local_animations
+
+function local_animations:new()
+    local obj = {}
+    setmetatable(obj, self)
+    obj.real_server_update = false
+    obj.fake_server_update = false
+    obj.real_simulation_time = 0.0
+    obj.fake_simulation_time = 0.0
+    obj.handle = nil
+    obj.spawntime = 0.0
+    obj.tickcount = 0.0
+    obj.abs_angles = 0.0
+    obj.pose_parameter = {}
+    for i=1,24 do obj.pose_parameter[i] = 0.0 end
+    obj.layers = {}
+    for i=1,13 do obj.layers[i] = {} end
+    obj.local_data = { prediction_animstate = nil, animstate = nil, stored_real_angles = vector(0,0,0), real_angles = vector(0,0,0), fake_angles = vector(0,0,0) }
+    return obj
+end
+
+function local_animations:run(stage)
+    local local_player = entity.get_local_player()
+    if local_player == nil or not ui.get(enable_resolver) then return end
+    local WEIGHT_CYCLE_RESET = 0.0
+    local LAYER_FAKE_WEIGHT = 3
+    local LAYER_FAKE_CYCLE = 3
+    local LAYER_YAW_WEIGHT = 12
+
+    if stage == client.FRAME_NET_UPDATE_END then
+        if not globals.fakelag_condition() and globals.keybind_state(20) then
+            self.fake_server_update = false
+
+            if entity.get_prop(local_player, "m_flSimulationTime") ~= self.fake_simulation_time then
+                self.fake_server_update = true
+                self.fake_simulation_time = entity.get_prop(local_player, "m_flSimulationTime")
+            end
+
+            self:reset_anim_layer(LAYER_FAKE_WEIGHT, WEIGHT_CYCLE_RESET)
+            self:reset_anim_layer(LAYER_FAKE_CYCLE, WEIGHT_CYCLE_RESET)
+            self:reset_anim_layer(LAYER_YAW_WEIGHT, WEIGHT_CYCLE_RESET)
+
+            self:update_fake_animations()
+        end
+    elseif stage == client.FRAME_RENDER_START then
+        local animstate = entity.get_animation_state(local_player)
+
+        if not animstate then return end
+
+        self.real_server_update = false
+
+        if entity.get_prop(local_player, "m_flSimulationTime") ~= self.real_simulation_time then
+            self.real_server_update = true
+            self.real_simulation_time = entity.get_prop(local_player, "m_flSimulationTime")
+        end
+
+        if globals.config("legsinair") then
+            animstate.time_since_in_air = 99.0
+            entity.set_prop(local_player, "m_flCycle", 0.0, 5)
+        end
+
+        self:update_local_animations(animstate)
+    elseif stage == client.FRAME_RENDER_START then
+        local animstate = entity.get_animation_state(local_player)
+
+        if not animstate then return end
+
+        self.real_server_update = false
+        self.fake_server_update = false
+local sim_time = entity.get_prop(local_player, "m_flSimulationTime")
+
+if sim_time ~= self.real_simulation_time or sim_time ~= self.fake_simulation_time then
+    self.real_server_update = true
+    self.fake_server_update = true
+    
+    self.real_simulation_time = sim_time
+    self.fake_simulation_time = sim_time
+end
+
+        self:reset_anim_layer(LAYER_FAKE_WEIGHT, WEIGHT_CYCLE_RESET)
+        self:reset_anim_layer(LAYER_FAKE_CYCLE, WEIGHT_CYCLE_RESET)
+        self:reset_anim_layer(LAYER_YAW_WEIGHT, WEIGHT_CYCLE_RESET)
+
+        self:update_local_animations(animstate)
+
+        if globals.config("legsinair") then
+            animstate.time_since_in_air = 99.0
+            entity.set_prop(local_player, "m_flCycle", 0.0, 5)
+        end
+
+        if globals.fakelag_condition() and globals.keybind_state(20) then
+            self.fake_server_update = false
+
+            if entity.get_prop(local_player, "m_flSimulationTime") ~= self.fake_simulation_time then
+                self.fake_server_update = true
+                self.fake_simulation_time = entity.get_prop(local_player, "m_flSimulationTime")
+            end
+
+            self:update_fake_animations()
+        end
+    end
+end
+
+function local_animations:reset_anim_layer(layer, weight)
+    local local_player = entity.get_local_player()
+    if local_player == nil then return end
+    local anim_layer = entity.get_prop(local_player, "m_flLayer", layer)
+    entity.set_prop(local_player, "m_flWeight", weight, layer)
+    entity.set_prop(local_player, "m_flCycle", weight, layer)
+end
+
+function local_animations:update_prediction_animations()
+    local local_player = entity.get_local_player()
+    if local_player == nil then return end
+    local alloc = not self.local_data.prediction_animstate
+    local change = not alloc and self.handle ~= entity.get_local_player_handle()
+    local reset = not alloc and not change and entity.get_prop(local_player, "m_flSpawnTime") ~= self.spawntime
+    if change then
+        self.local_data.prediction_animstate = nil
+    end
+
+    if reset then
+        globals.reset_state(self.local_data.prediction_animstate)
+        self.spawntime = entity.get_prop(local_player, "m_flSpawnTime")
+    end
+
+    if alloc or change then
+        self.local_data.prediction_animstate = globals.create_state(local_player)
+        self.handle = entity.get_local_player_handle()
+        self.spawntime = entity.get_prop(local_player, "m_flSpawnTime")
+    end
+
+    if not alloc and not change and not reset then
+        local pose_parameter = {}
+        for i=1,24 do pose_parameter[i] = entity.get_prop(local_player, "m_flPoseParameter", i) end
+
+        local layers = {}
+        for i=1,13 do layers[i] = entity.get_prop(local_player, "m_flLayer", i) end
+
+        self.local_data.prediction_animstate.base_entity = local_player
+        globals.update_state(self.local_data.prediction_animstate, vector(0,0,0))
+
+        entity.setup_bones_fixed(globals.prediction_matrix, globals.BONE_USED_BY_HITBOX)
+
+        for i=1,24 do entity.set_prop(local_player, "m_flPoseParameter", pose_parameter[i], i) end
+        for i=1,13 do entity.set_prop(local_player, "m_flLayer", layers[i], i) end
+    end
+end
+
+function local_animations:update_fake_animations()
+    local local_player = entity.get_local_player()
+    if local_player == nil then return end
+    local alloc = not self.local_data.animstate
+    local change = not alloc and self.handle ~= entity.get_local_player_handle()
+    local reset = not alloc and not change and entity.get_prop(local_player, "m_flSpawnTime") ~= self.spawntime
+
+    if change then
+        self.local_data.animstate = nil
+    end
+
+    if reset then
+        globals.reset_state(self.local_data.animstate)
+        self.spawntime = entity.get_prop(local_player, "m_flSpawnTime")
+    end
+
+    if alloc or change then
+        self.local_data.animstate = globals.create_state(local_player)
+        self.handle = entity.get_local_player_handle()
+        self.spawntime = entity.get_prop(local_player, "m_flSpawnTime")
+    end
+
+    if not alloc and not change and not reset and self.fake_server_update then
+        local pose_parameter = {}
+        for i=1,24 do pose_parameter[i] = entity.get_prop(local_player, "m_flPoseParameter", i) end
+
+        local layers = {}
+        for i=1,15 do layers[i] = entity.get_prop(local_player, "m_flLayer", i) end
+
+        local backup_frametime = globals.frametime()
+        local backup_curtime = globals.curtime()
+
+        globals.set_frametime(globals.interval_per_tick())
+        globals.set_curtime(entity.get_prop(local_player, "m_flSimulationTime"))
+
+        self.local_data.animstate.base_entity = local_player
+        globals.update_state(self.local_data.animstate, self.local_data.fake_angles)
+
+        self.local_data.animstate.in_hit_ground_animation = false
+        self.local_data.animstate.landing_duck_additive_something = 0.0
+        self.local_data.animstate.head_height_or_offset_from_hitting_ground_animation = 1.0
+
+        entity.setup_bones_fixed(globals.fake_matrix, globals.BONE_USED_BY_ANYTHING)
+
+        globals.set_frametime(backup_frametime)
+        globals.set_curtime(backup_curtime)
+
+        for i=1,24 do entity.set_prop(local_player, "m_flPoseParameter", pose_parameter[i], i) end
+        for i=1,15 do entity.set_prop(local_player, "m_flLayer", layers[i], i) end
+    end
+end
+
+function local_animations:update_local_animations(animstate)
+    if globals.tickcount() ~= self.tickcount then
+        self.tickcount = globals.tickcount()
+
+        self:update_animlayers()
+
+        self:update_animstate(animstate)
+
+        self:update_abs_angles()
+
+        self:save_pose_parameter()
+    else
+        animstate.last_client_side_animation_update_framecount = globals.framecount()
+    end
+
+    self:update_goal_feet_yaw(animstate)
+
+    self:update_abs_angles_in_entity(animstate)
+
+    self:restore_pose_parameter()
+end
+
+function local_animations:update_animlayers()
+    local local_player = entity.get_local_player()
+    if local_player == nil then return end
+    for i=1,13 do
+        self.layers[i] = entity.get_prop(local_player, "m_flLayer", i)
+    end
+end
+
+function local_animations:update_animstate(animstate)
+    if self.local_data.animstate then
+        animstate.duck_amount = self.local_data.animstate.duck_amount
+    end
+
+    animstate.last_client_side_animation_update_framecount = 0
+    globals.update_state(animstate, self.local_data.fake_angles)
+end
+
+function local_animations:update_abs_angles()
+    if self.real_server_update then
+        self.abs_angles = self.local_data.real_angles.y
+    else
+        self.abs_angles = globals.antiaim_condition(globals.get_command()) and self.abs_angles or self.local_data.real_angles.y
+    end
+end
+
+function local_animations:save_pose_parameter()
+    local local_player = entity.get_local_player()
+    if local_player == nil then return end
+    for i=1,24 do
+        self.pose_parameter[i] = entity.get_prop(local_player, "m_flPoseParameter", i)
+    end
+end
+
+function local_animations:update_goal_feet_yaw(animstate)
+    animstate.goal_feet_yaw = self.abs_angles
+end
+
+function local_animations:update_abs_angles_in_entity(animstate)
+    local local_player = entity.get_local_player()
+    if local_player == nil then return end
+    entity.set_abs_angles(local_player, vector(0, self.abs_angles, 0))
+    for i=1,13 do entity.set_prop(local_player, "m_flLayer", self.layers[i], i) end
+end
+
+function local_animations:restore_pose_parameter()
+    local local_player = entity.get_local_player()
+    if local_player == nil then return end
+    for i=1,24 do
+        entity.set_prop(local_player, "m_flPoseParameter", self.pose_parameter[i], i)
+    end
+end
 
 local function normalize_yaw(yaw)
     while yaw > 180 do yaw = yaw - 360 end
@@ -160,54 +626,61 @@ local function normalize_yaw(yaw)
 end
 
 local function normalize_pitch(pitch)
-    return math.clamp(pitch, -89, 89)
+    if pitch > 89 then return 89 end
+    if pitch < -89 then return -89 end
+    return pitch
 end
 
 local function angle_diff(a1, a2)
-    a1 = normalize_yaw(a1)
-    a2 = normalize_yaw(a2)
     local diff = normalize_yaw(a2 - a1)
     return diff
 end
 
-local function calculate_angle(from, to)
-    local diff = to - from
-    local yaw = math.deg(math.atan2(diff.y, diff.x))
-    local pitch = -math.deg(math.atan2(diff.z, diff:length2d()))
-    return vector(pitch, yaw, 0)
+local function angle_to_vec(yaw)
+    yaw = math.rad(yaw)
+    return vector(math.cos(yaw), math.sin(yaw), 0)
 end
 
+local old_velocity_2D = {}
+for i=1,64 do old_velocity_2D[i] = 0.0 end
+local tick_counter = {}
+for i=1,64 do tick_counter[i] = 0 end
 
 local resolver = {}
 resolver.__index = resolver
 
 function resolver:new()
-    local self = setmetatable({}, resolver)
-    self.player = nil
-    self.player_record = nil
-    self.prev_record = nil
-    self.side = false
-    self.fake = false
-    self.was_first_bruteforce = false
-    self.was_second_bruteforce = false
-    self.original_goal_feet_yaw = 0.0
-    self.original_pitch = 0.0
-    return self
+    local obj = {}
+    setmetatable(obj, self)
+    obj.player = nil
+    obj.player_record = nil
+    obj.prev_record = nil
+    obj.side = false
+    obj.fake = false
+    obj.was_first_bruteforce = false
+    obj.was_second_bruteforce = false
+    obj.lock_side = 0.0
+    obj.original_goal_feet_yaw = 0.0
+    obj.original_pitch = 0.0
+    obj.resolver_layers = {}
+    for i=1,3 do obj.resolver_layers[i] = {} for j=1,15 do obj.resolver_layers[i][j] = {} end end
+    obj.previous_layers = {}
+    for i=1,15 do obj.previous_layers[i] = {} end
+    obj.resolver_goal_feet_yaw = {0,0,0}
+    obj.last_angle = 0.0
+    obj.switch = false
+    obj.last_brute = 0
+    obj.last_update_time = 0.0
+    return obj
 end
 
 function resolver:initialize(e, record, goal_feet_yaw, pitch, previous_record)
+    if e == nil then return end
     self.player = e
     self.player_record = record
-    if previous_record then
-        self.prev_record = previous_record
-    end
+    if previous_record then self.prev_record = previous_record end
     self.original_pitch = normalize_pitch(pitch)
     self.original_goal_feet_yaw = normalize_yaw(goal_feet_yaw)
-end
-
-function resolver:lagcomp_initialize(player, origin, velocity, flags, on_ground)
-
-    lagcompensation:extrapolate(player, origin, velocity, flags, on_ground)
 end
 
 function resolver:reset()
@@ -223,10 +696,11 @@ function resolver:reset()
 end
 
 function resolver:is_breaking_lby(cur_layer, prev_layer)
+    if cur_layer == nil or prev_layer == nil then return false end
     if self:IsAdjustingBalance() then
-        if (prev_layer.cycle ~= cur_layer.cycle) and cur_layer.weight == 1.0 then
+        if prev_layer.cycle ~= cur_layer.cycle and cur_layer.weight == 1.0 then
             return true
-        elseif cur_layer.weight == 0.0 and (prev_layer.cycle > 0.92 and cur_layer.cycle > 0.92) then
+        elseif cur_layer.weight == 0.0 and prev_layer.cycle > 0.92 and cur_layer.cycle > 0.92 then
             return true
         end
     end
@@ -234,8 +708,9 @@ function resolver:is_breaking_lby(cur_layer, prev_layer)
 end
 
 function resolver:IsAdjustingBalance()
-    for i = 0, 12 do
-        local activity = self.player:sequence_activity(self.player_record.layers[i].sequence)
+    if self.player == nil or self.player_record == nil then return false end
+    for i=1,13 do
+        local activity = entity.get_sequence_activity(self.player, self.player_record.layers[i].sequence)
         if activity == 979 then
             return true
         end
@@ -244,97 +719,541 @@ function resolver:IsAdjustingBalance()
 end
 
 function resolver:is_slow_walking()
-    local old_velocity_2D = {} 
-    local tick_counter = {} 
-    
-    if not old_velocity_2D[self.player:get_prop("m_iIndex")] then old_velocity_2D[self.player:get_prop("m_iIndex")] = 0.0 end
-    if not tick_counter[self.player:get_prop("m_iIndex")] then tick_counter[self.player:get_prop("m_iIndex")] = 0 end
+    if self.player == nil or not entity.is_alive(self.player) then return false end
+    local velocity = entity.get_prop(self.player, "m_vecVelocity") or vector(0,0,0)
+    local velocity_2D = math.sqrt(velocity.x^2 + velocity.y^2)
 
-    local velocity = self.player:get_prop("m_vecVelocity")
-    local velocity_2D = velocity:length2d()
-    if velocity_2D ~= old_velocity_2D[self.player:get_prop("m_iIndex")] then
-        old_velocity_2D[self.player:get_prop("m_iIndex")] = velocity_2D
-        tick_counter[self.player:get_prop("m_iIndex")] = 0
+    local idx = entity.get_ent_index(self.player)
+
+    if velocity_2D ~= old_velocity_2D[idx] then
+        old_velocity_2D[idx] = velocity_2D
+        tick_counter[idx] = 0
     else
-        tick_counter[self.player:get_prop("m_iIndex")] = tick_counter[self.player:get_prop("m_iIndex")] + 1
-        local max_ticks = math.floor(0.1 / globals.tickinterval())
-        if tick_counter[self.player:get_prop("m_iIndex")] > max_ticks then
+        tick_counter[idx] = tick_counter[idx] + 1
+
+        local max_ticks = math.floor(0.1 / globals.interval_per_tick())
+
+        if tick_counter[idx] > max_ticks then
             return true
         end
     end
+
     return false
 end
 
-function resolver:GetChokedPackets()
-    local last_ticks = {} 
-    if not last_ticks[self.player:get_prop("m_iIndex")] then last_ticks[self.player:get_prop("m_iIndex")] = 0 end
+local last_ticks = {}
+for i=1,65 do last_ticks[i] = 0 end
 
-    local ticks = globals.time_to_ticks(self.player:get_prop("m_flSimulationTime") - self.player:get_prop("m_flOldSimulationTime"))
-    if ticks == 0 and last_ticks[self.player:get_prop("m_iIndex")] > 0 then
-        return last_ticks[self.player:get_prop("m_iIndex")] - 1
+function resolver:GetChokedPackets()
+    if self.player == nil then return 0 end
+    local ticks = globals.time_to_ticks(entity.get_prop(self.player, "m_flSimulationTime") - entity.get_prop(self.player, "m_flOldSimulationTime"))
+
+    local idx = entity.get_ent_index(self.player)
+    if ticks == 0 and last_ticks[idx] > 0 then
+        return last_ticks[idx] - 1
     else
-        last_ticks[self.player:get_prop("m_iIndex")] = ticks
+        last_ticks[idx] = ticks
         return ticks
     end
 end
 
+function resolver:lagcomp_initialize(player, origin, velocity, flags, on_ground)
+    globals.extrapolate(player, origin, velocity, flags, on_ground)
+end
+
 function resolver:get_side_standing()
-    local angle_difference = angle_diff(self.player:get_prop("m_angEyeAngles").y, self.original_goal_feet_yaw)
-    self.player_record.curSide = (angle_difference <= 0.0) and "LEFT1" or "RIGHT1"
+    if self.player == nil then return end
+    local eye_angles = entity.get_prop(self.player, "m_angEyeAngles") or vector(0,0,0)
+    local angle_difference = angle_diff(eye_angles.y, self.original_goal_feet_yaw)
+    self.player_record.curSide = angle_difference <= 0.0 and globals.LEFT1 or globals.RIGHT1
 end
 
 local function get_backward_side(player)
-    return calculate_angle(entity.get_local_player():get_prop("m_vecOrigin"), player:get_prop("m_vecOrigin")).y
+    if player == nil then return 0 end
+    return globals.calculate_angle(entity.get_origin(entity.get_local_player()), entity.get_origin(player)).y
 end
 
 local function resolve_update_animations(e)
-    e:update_client_animations()
+    entity.update_clientside_animation(e)
 end
 
 local function GetHitboxPos(player, mat, hitbox_id)
     if not player then return vector(0,0,0) end
-    
-    return entity.get_hitbox_position(player:get_prop("m_iIndex"), hitbox_id) or vector(0,0,0)
+
+    local hdr = entity.get_studio_hdr(player)
+
+    if not hdr then return vector(0,0,0) end
+
+    local hitbox_set = hdr.hitbox_set(entity.get_prop(player, "m_nHitboxSet"))
+
+    if not hitbox_set then return vector(0,0,0) end
+
+    local hitbox = hitbox_set.hitbox(hitbox_id)
+
+    if not hitbox then return vector(0,0,0) end
+
+    local min = math.vector_transform(hitbox.bbmin, mat[hitbox.bone])
+    local max = math.vector_transform(hitbox.bbmax, mat[hitbox.bone])
+
+    return (min + max) * 0.5
 end
 
-local function resolve_yaw()
-    
+function resolver:resolve_yaw()
+    if self.player == nil or not entity.is_alive(self.player) or self.player_record == nil then return end
+
+    if self.player_record.bot then return end
+
+    local eye_yaw = self.player_record.angles.y
+    local lby = self.player_record.lby
+    local delta = math.abs(angle_diff(eye_yaw, lby))
+
+    if delta < 35 then 
+        self.fake = false
+        self.player_record.type = ORIGINAL
+        self.player_record.side = NO_SIDE
+        return 
+    end
+
+    self.fake = true
+
+    local cur_layer = self.player_record.layers[3]
+
+    if cur_layer.weight <= 0.1 then
+        local current_angle = eye_yaw
+        if math.abs(current_angle - self.last_angle) <= 50.0 then
+            self.switch = not self.switch
+            self.last_angle = current_angle
+            self.player_record.side = self.switch and globals.LEFT1 or globals.RIGHT1
+            self.last_brute = self.player_record.side
+            self.last_update_time = globals.curtime()
+        else
+            if math.abs(self.last_update_time - globals.curtime()) >= (0.22) or self:GetChokedPackets() == 0 then
+                self.last_angle = current_angle
+            end
+            self.player_record.side = self.last_brute
+        end
+        self.player_record.type = JITTER
+        return
+    end
+
+    local speed = self.player_record.velocity:length2d()
+    local mode = NO_MODE
+
+    if bit.band(self.player_record.flags, globals.FL_ONGROUND) == 0 then 
+        mode = AIR 
+    elseif speed < 1.5 then 
+        mode = STANDING 
+    elseif speed < 35 then 
+        mode = SLOW_WALKING 
+    else 
+        mode = MOVING 
+    end
+
+    self.player_record.curMode = mode
+
+    if mode == AIR then
+        self.player_record.type = ORIGINAL
+        self.player_record.side = NO_SIDE
+        return
+    end
+
+    if mode == MOVING then
+        self:get_side_standing()
+        self.player_record.side = self.player_record.curSide
+        self.player_record.type = DIRECTIONAL
+        return
+    end
+
+    if mode == SLOW_WALKING then
+        if self:is_slow_walking() then
+            self.player_record.type = LBY
+            local lby_delta = angle_diff(eye_yaw, lby)
+            self.player_record.side = lby_delta > 0 and globals.LEFT1 or globals.RIGHT1
+            return
+        else
+            self:get_side_standing()
+            self.player_record.side = self.player_record.curSide
+            self.player_record.type = DIRECTIONAL
+            return
+        end
+    end
+
+    if mode == STANDING then
+        local cur_layer = self.player_record.layers[3]  -- assuming layer 3 for desync
+        local prev_layer = self.prev_record and self.prev_record.layers[3] or cur_layer
+
+        if self:is_breaking_lby(cur_layer, prev_layer) then
+            self.player_record.type = LBY
+            local lby_delta = angle_diff(eye_yaw, self.player_record.lby)
+            self.player_record.side = lby_delta > 0 and globals.LEFT1 or globals.RIGHT1
+            return
+        end
+
+        local idx = entity.get_ent_index(self.player)
+        local misses = globals.missed_shots[idx]
+
+        if misses > 0 then
+            self.player_record.type = BRUTEFORCE
+            if misses % 5 == 1 then
+                self.was_first_bruteforce = true
+                self.player_record.side = globals.LEFT1
+            elseif misses % 5 == 2 then
+                self.was_second_bruteforce = true
+                self.player_record.side = globals.RIGHT1
+            elseif misses % 5 == 3 then
+                self.player_record.side = LOW_LEFT
+            elseif misses % 5 == 4 then
+                self.player_record.side = LOW_RIGHT
+            else
+                self.player_record.side = NO_SIDE
+            end
+            return
+        end
+
+        -- freestand trace
+        local head_pos = entity.hitbox_position(self.player, 0)
+        local eye_yaw = entity.get_prop(self.player, "m_angEyeAngles").y or 0
+        local left_vec = angle_to_vec(eye_yaw + 90) * 100
+        local right_vec = angle_to_vec(eye_yaw - 90) * 100
+        local left_end = head_pos + left_vec
+        local right_end = head_pos + right_vec
+
+        local left_fraction, _, _, _, _ = client.trace_line(self.player, head_pos.x, head_pos.y, head_pos.z + 5, left_end.x, left_end.y, left_end.z + 5)
+        local right_fraction, _, _, _, _ = client.trace_line(self.player, head_pos.x, head_pos.y, head_pos.z + 5, right_end.x, right_end.y, right_end.z + 5)
+
+        if math.abs(left_fraction - right_fraction) > 0.25 then
+            self.player_record.type = TRACE
+            self.player_record.side = left_fraction > right_fraction and globals.LEFT1 or globals.RIGHT1
+            return
+        end
+
+        -- default standing
+        self:get_side_standing()
+        self.player_record.side = self.player_record.curSide
+        self.player_record.type = ANIMATION
+    end
 end
 
+local MAIN = 0
+local NONE = 1
+local FIRST = 2
+local SECOND = 3
+local LOW_FIRST = 4
+local LOW_SECOND = 5
+
+local ORIGINAL = 0
+local BRUTEFORCE = 1
+local LBY = 2
+local TRACE = 3
+local JITTER = 4
+local DIRECTIONAL = 5
+local ENGINE = 6
+local ANIMATION = 7
+
+local HISTORY_UNKNOWN = -1
+local HISTORY_ORIGINAL = 0
+local HISTORY_ZERO = 1
+local HISTORY_DEFAULT = 2
+local HISTORY_LOW = 3
+
+local AIR = 0
+local SLOW_WALKING = 1
+local MOVING = 2
+local STANDING = 3
+local FREESTANDING = 4
+local NO_MODE = 5
+
+local NO_SIDE = 0
+local LEFT1 = 1
+local RIGHT1 = 2
+local LOW_LEFT = -2
+local LOW_RIGHT = 2
+
+local RESOLVER_ORIGINAL = 0
+local RESOLVER_ZERO = 1
+local RESOLVER_FIRST = 2
+local RESOLVER_SECOND = 3
+local RESOLVER_LOW_FIRST = 4
+local RESOLVER_LOW_SECOND = 5
+local RESOLVER_JITTER_FIRST = 6
+local RESOLVER_JITTER_SECOND = 7
+local RESOLVER_ROLL_FIRST = 8
+local RESOLVER_ROLL_SECOND = 9
+local RESOLVER_DEFAULT = 10
+
+local matrixes = {}
+matrixes.main = {}
+for i=1,128 do matrixes.main[i] = {} end
+matrixes.positive = {}
+for i=1,128 do matrixes.positive[i] = {} end
+matrixes.negative = {}
+for i=1,128 do matrixes.negative[i] = {} end
+matrixes.zero = {}
+for i=1,128 do matrixes.zero[i] = {} end
+matrixes.first = {}
+for i=1,128 do matrixes.first[i] = {} end
+matrixes.second = {}
+for i=1,128 do matrixes.second[i] = {} end
+matrixes.low_first = {}
+for i=1,128 do matrixes.low_first[i] = {} end
+matrixes.low_second = {}
+for i=1,128 do matrixes.low_second[i] = {} end
+
+local player_records = {}
+for i=1,65 do player_records[i] = {} end
+
+local adjust_data = {}
+adjust_data.__index = adjust_data
+
+function adjust_data:new(e, store)
+    local obj = {}
+    setmetatable(obj, self)
+    obj.player = nil
+    obj.i = 0
+    obj.layers = {}
+    for i=1,15 do obj.layers[i] = {} end
+    obj.movelayers = {}
+    for i=1,3 do obj.movelayers[i] = {} for j=1,15 do obj.movelayers[i][j] = {} end end
+    obj.matrixes_data = matrixes
+    obj.type = 0
+    obj.side = 0
+    obj.invalid = false
+    obj.immune = false
+    obj.dormant = false
+    obj.bot = false
+    obj.shot = false
+    obj.curSide = NO_SIDE
+    obj.curMode = NO_MODE
+    obj.flags = 0
+    obj.bone_count = 0
+    obj.last_shot_time = 0.0
+    obj.simulation_time = 0.0
+    obj.duck_amount = 0.0
+    obj.lby = 0.0
+    obj.angles = vector(0,0,0)
+    obj.abs_angles = vector(0,0,0)
+    obj.velocity = vector(0,0,0)
+    obj.origin = vector(0,0,0)
+    obj.mins = vector(0,0,0)
+    obj.maxs = vector(0,0,0)
+    if e then
+        obj.invalid = false
+        obj:store_data(e, store)
+        obj.curSide = NO_SIDE
+        obj.curMode = NO_MODE
+    end
+    return obj
+end
+
+function adjust_data:reset()
+    self.player = nil
+    self.i = -1
+    self.invalid = false
+    self.immune = false
+    self.dormant = false
+    self.bot = false
+    self.shot = false
+    self.flags = 0
+    self.bone_count = 0
+    self.last_shot_time = 0.0
+    self.simulation_time = 0.0
+    self.duck_amount = 0.0
+    self.lby = 0.0
+    self.curSide = NO_SIDE
+    self.curMode = NO_MODE
+    self.angles = vector(0,0,0)
+    self.abs_angles = vector(0,0,0)
+    self.velocity = vector(0,0,0)
+    self.origin = vector(0,0,0)
+    self.mins = vector(0,0,0)
+    self.maxs = vector(0,0,0)
+end
+
+function adjust_data:store_data(e, store)
+    if e == nil or not entity.is_alive(e) then return end
+
+    self.player = e
+    self.i = entity.get_ent_index(e)
+
+    if store then
+        self.layers = entity.get_anim_overlay(e)
+        self.matrixes_data.main = entity.get_bone_matrix(e)
+    end
+
+    self.immune = entity.get_prop(e, "m_bGunGameImmunity") or bit.band(entity.get_prop(e, "m_fFlags"), globals.FL_FROZEN) ~= 0
+    self.dormant = entity.is_dormant(e)
+
+    local player_info = client.get_player_info(self.i)
+    self.bot = player_info.bot
+
+    self.flags = entity.get_prop(e, "m_fFlags")
+    self.bone_count = entity.cached_bone_count(e)
+
+    local weapon = entity.get_player_weapon(e)
+    self.last_shot_time = weapon and entity.get_prop(weapon, "m_fLastShotTime") or 0.0
+    self.simulation_time = entity.get_prop(e, "m_flSimulationTime")
+    self.duck_amount = entity.get_prop(e, "m_flDuckAmount")
+    self.lby = entity.get_prop(e, "m_flLowerBodyYawTarget")
+
+    self.angles = entity.get_prop(e, "m_angEyeAngles")
+    self.abs_angles = entity.get_abs_angles(e)
+    self.velocity = entity.get_prop(e, "m_vecVelocity")
+    self.origin = entity.get_prop(e, "m_vecOrigin")
+    self.mins = entity.get_collideable_mins(e)
+    self.maxs = entity.get_collideable_maxs(e)
+end
+
+function adjust_data:adjust_player()
+    if not self:valid(false) then return end
+
+    entity.set_prop(self.player, "m_flLayer", self.layers, 15)
+    entity.set_prop(self.player, "m_CachedBoneData", self.matrixes_data.main, entity.cached_bone_count(self.player))
+
+    entity.set_prop(self.player, "m_fFlags", self.flags)
+    entity.set_prop(self.player, "m_CachedBoneDataSize", self.bone_count)
+
+    entity.set_prop(self.player, "m_flSimulationTime", self.simulation_time)
+    entity.set_prop(self.player, "m_flDuckAmount", self.duck_amount)
+    entity.set_prop(self.player, "m_flLowerBodyYawTarget", self.lby)
+
+    entity.set_prop(self.player, "m_angEyeAngles", self.angles.x, self.angles.y, self.angles.z)
+    entity.set_abs_angles(self.player, self.abs_angles)
+    entity.set_prop(self.player, "m_vecVelocity", self.velocity.x, self.velocity.y, self.velocity.z)
+    entity.set_prop(self.player, "m_vecOrigin", self.origin.x, self.origin.y, self.origin.z)
+    entity.set_abs_origin(self.player, self.origin)
+    entity.set_collideable_mins(self.player, self.mins)
+    entity.set_collideable_maxs(self.player, self.maxs)
+end
+
+function adjust_data:valid(extra_checks)
+    if not self then return false end
+
+    if self.i > 0 then
+        self.player = self.i
+    end
+
+    if not self.player then return false end
+
+    if entity.get_prop(self.player, "m_lifeState") ~= 0 then return false end
+
+    if self.immune then return false end
+
+    if self.dormant then return false end
+
+    if not extra_checks then return true end
+
+    if self.invalid then return false end
+
+    local net_channel_info = client.get_net_channel_info()
+
+    if not net_channel_info then return false end
+
+    local sv_maxunlag = cvar.sv_maxunlag:get_float()
+
+    local outgoing = net_channel_info.latency_out
+    local incoming = net_channel_info.latency_in
+
+    local correct = math.clamp(outgoing + incoming + globals.interpolation(), 0.0, sv_maxunlag)
+
+    local curtime = entity.is_alive(entity.get_local_player()) and globals.time_to_ticks(globals.fixed_tickbase) or globals.curtime()
+    local delta_time = correct - (curtime - self.simulation_time)
+
+    if math.abs(delta_time) > 0.2 then return false end
+
+    local extra_choke = 0
+
+    if globals.fakeducking then
+        extra_choke = 14 - globals.choked_commands()
+    end
+
+    local server_tickcount = extra_choke + globals.tickcount() + globals.time_to_ticks(outgoing + incoming)
+    local dead_time = globals.time_to_ticks(server_tickcount) - sv_maxunlag
+
+    if self.simulation_time < dead_time then return false end
+
+    return true
+end
+
+local optimized_adjust_data = {}
+optimized_adjust_data.__index = optimized_adjust_data
+
+function optimized_adjust_data:new()
+    local obj = {}
+    setmetatable(obj, self)
+    obj.i = 0
+    obj.player = nil
+    obj.simulation_time = 0.0
+    obj.duck_amount = 0.0
+    obj.speed = 0.0
+    obj.shot = false
+    obj.angles = vector(0,0,0)
+    obj.origin = vector(0,0,0)
+    return obj
+end
+
+function optimized_adjust_data:reset()
+    self.i = 0
+    self.player = nil
+    self.simulation_time = 0.0
+    self.duck_amount = 0.0
+    self.speed = 0.0
+    self.shot = false
+    self.angles = vector(0,0,0)
+    self.origin = vector(0,0,0)
+end
+
+local player_settings = {}
+function new_player_settings(id, res_type, faking, neg, pos)
+    return {id = id, res_type = res_type, faking = faking, neg = neg, pos = pos}
+end
 
 local lagcompensation = {}
 lagcompensation.__index = lagcompensation
 
 function lagcompensation:new()
-    local self = setmetatable({}, lagcompensation)
-    self.player_records = {} 
-    for i=1, 65 do self.player_records[i] = {} end
-    return self
+    local obj = {}
+    setmetatable(obj, self)
+    obj.player_resolver = {}
+    for i=1,65 do obj.player_resolver[i] = resolver:new() end
+    obj.is_dormant = {}
+    for i=1,65 do obj.is_dormant[i] = false end
+    obj.previous_goal_feet_yaw = {}
+    for i=1,65 do obj.previous_goal_feet_yaw[i] = 0.0 end
+    return obj
 end
 
 function lagcompensation:fsn(stage)
     if not ui.get(enable_resolver) then return end
-    if stage ~= "FRAME_NET_UPDATE_END" then return end 
-    if not ui.get("rage_enabled") then return end 
+    if stage ~= client.FRAME_NET_UPDATE_END then return end
 
-    for i = 1, globals.maxclients() do
-        local e = entity.get_player_entity(i)
+    if not globals.config("rage_enabled") then return end
+
+    if entity.get_local_player() == nil then return end
+
+    for _, i in ipairs(entity.get_players(true)) do
+        local e = i
+
         if e == entity.get_local_player() then goto continue end
+
         if not self:valid(i, e) then goto continue end
 
-        if #self.player_records[i] == 0 or (#self.player_records[i] > 0 and e:get_prop("m_flSimulationTime") ~= e:get_prop("m_flOldSimulationTime")) then
-            if #self.player_records[i] > 0 and (e:get_prop("m_vecOrigin") - self.player_records[i][1].origin):lengthsq() > 4096.0 then
-                for _, record in ipairs(self.player_records[i]) do
-                    record.invalid = true
+        local sim_time = entity.get_prop(e, "m_flSimulationTime")
+        local old_sim_time = entity.get_prop(e, "m_flOldSimulationTime")
+
+        if sim_time and old_sim_time then
+            if #player_records[i] == 0 or (#player_records[i] > 0 and sim_time ~= old_sim_time) then
+                if #player_records[i] > 0 and (entity.get_origin(e) - player_records[i][1].origin):length_sq() > 4096.0 then
+                    for _, record in ipairs(player_records[i]) do
+                        record.invalid = true
+                    end
                 end
-            end
-            table.insert(self.player_records[i], 1, { 
-                layers = {}, 
-               
-            })
-            self:update_player_animations(e)
-            if #self.player_records[i] > 32 then
-                table.remove(self.player_records[i])
+
+                table.insert(player_records[i], 1, adjust_data:new(e))
+                self:update_player_animations(e)
+
+                if #player_records[i] > 32 then
+                    table.remove(player_records[i])
+                end
             end
         end
         ::continue::
@@ -342,17 +1261,18 @@ function lagcompensation:fsn(stage)
 end
 
 function lagcompensation:valid(i, e)
-    if not ui.get(enable_resolver) then return false end
-    if not ui.get("rage_enabled") or not e:valid(false) then
-        if not e:is_alive() then
-            is_dormant[i] = false 
-            player_resolver[i]:reset()
+    if not globals.config("rage_enabled") or not globals.valid_player(e, false) then
+        if not entity.is_alive(e) then
+            self.is_dormant[i] = false
+            self.player_resolver[i]:reset()
+
             globals.fired_shots[i] = 0
             globals.missed_shots[i] = 0
-        elseif e:is_dormant() then
-            is_dormant[i] = true
+        elseif entity.is_dormant(e) then
+            self.is_dormant[i] = true
         end
-        self.player_records[i] = {}
+
+        player_records[i] = {}
         return false
     end
     return true
@@ -363,25 +1283,28 @@ local function IsNearEqual(v1, v2, Tolerance)
 end
 
 function lagcompensation:ent_use_jitter(player, new_side, player_record)
-    if not ui.get(enable_resolver) then return end
-    if not player:is_alive() then return end
-    if not player:valid(false, false) then return end
-    if player:is_dormant() then return end
+    if not entity.is_alive(player) then return end
 
-    local LastAngle = {} 
+    if not globals.valid_player(player, false, false) then return end
+
+    if entity.is_dormant(player) then return end
+
+    local LastAngle = {}
+    for i=1,64 do LastAngle[i] = 0.0 end
     local LastBrute = {}
+    for i=1,64 do LastBrute[i] = 0 end
     local Switch = {}
+    for i=1,64 do Switch[i] = false end
     local LastUpdateTime = {}
+    for i=1,64 do LastUpdateTime[i] = 0.0 end
+    local layers = {}
+    for i=1,13 do layers[i] = entity.get_prop(player, "m_flLayer", i) end
 
-    local i = player:get_prop("m_iIndex")
-    if not LastAngle[i] then LastAngle[i] = 0 end
-    
-
-    local layers = player:get_anim_layers()
-    local animstate = player:get_anim_state() 
-    local speed = player:get_prop("m_vecVelocity"):length2d()
+    local i = entity.get_ent_index(player)
+    local animstate = entity.get_animation_state(player)
+    local speed = math.sqrt(entity.get_prop(player, "m_vecVelocity").x^2 + entity.get_prop(player, "m_vecVelocity").y^2)
     local delta = angle_diff(animstate.goal_feet_yaw, animstate.eye_yaw)
-    local CurrentAngle = player:get_prop("m_angEyeAngles").y
+    local CurrentAngle = entity.get_prop(player, "m_angEyeAngles").y
     local goalfeetyaw = animstate.goal_feet_yaw
 
     if layers[3].weight <= 0.1 then
@@ -392,7 +1315,7 @@ function lagcompensation:ent_use_jitter(player, new_side, player_record)
             LastBrute[i] = new_side
             LastUpdateTime[i] = globals.curtime()
         else
-            if math.abs(LastUpdateTime[i] - globals.curtime()) >= globals.ticks_to_time(17) or player:get_prop("m_flSimulationTime") ~= player:get_prop("m_flOldSimulationTime") then
+            if math.abs(LastUpdateTime[i] - globals.curtime()) >= globals.time_to_ticks(17) or entity.get_prop(player, "m_flSimulationTime") ~= entity.get_prop(player, "m_flOldSimulationTime") then
                 LastAngle[i] = CurrentAngle
             end
             new_side = LastBrute[i]
@@ -401,586 +1324,613 @@ function lagcompensation:ent_use_jitter(player, new_side, player_record)
 end
 
 function lagcompensation:extrapolate(player, origin, velocity, flags, on_ground)
-    if not ui.get(enable_resolver) then return end
     local start = origin
-    local end_pos = start + (velocity * globals.tickinterval())
-    local trace = client.trace_line(start, end_pos, player:get_prop("m_vecMins"), player:get_prop("m_vecMaxs"), "MASK_PLAYERSOLID & ~CONTENTS_MONSTER") -- Adapt to API
+    local end_pos = start + (velocity * globals.interval_per_tick())
+
+    local trace = client.trace_hull(start, end_pos, entity.get_prop(player, "m_vecMins"), entity.get_prop(player, "m_vecMaxs"), globals.MASK_PLAYERSOLID - globals.CONTENTS_MONSTER)
 
     if trace.fraction ~= 1.0 then
-        for i=1, 2 do
-            velocity = velocity - trace.plane.normal * velocity:dot(trace.plane.normal)
-            local adjust = velocity:dot(trace.plane.normal)
-            if adjust < 0 then
-                velocity = velocity - (trace.plane.normal * adjust)
+        for i=1,2 do
+            velocity = velocity - (trace.plane_normal * velocity:dot(trace.plane_normal))
+
+            local adjust = velocity:dot(trace.plane_normal)
+            if adjust < 0.0 then
+                velocity = velocity - (trace.plane_normal * adjust)
             end
+
             start = trace.endpos
-            end_pos = start + (velocity * (globals.tickinterval() * (1.0 - trace.fraction)))
-            trace = client.trace_line(start, end_pos, player:get_prop("m_vecMins"), player:get_prop("m_vecMaxs"), "MASK_PLAYERSOLID & ~CONTENTS_MONSTER")
-            if trace.fraction == 1.0 then break end
+            end_pos = start + (velocity * (globals.interval_per_tick() * (1.0 - trace.fraction)))
+
+            local two_trace = client.trace_hull(start, end_pos, entity.get_prop(player, "m_vecMins"), entity.get_prop(player, "m_vecMaxs"), globals.MASK_PLAYERSOLID - globals.CONTENTS_MONSTER)
+
+            if two_trace.fraction == 1.0 then break end
         end
     end
-    local temp_endpos = trace.endpos
-    start = temp_endpos
-    end_pos = temp_endpos
-    origin = temp_endpos
+local start, end_pos, origin = trace.endpos, trace.endpos, trace.endpos
+
     end_pos.z = end_pos.z - 2.0
-    trace = client.trace_line(start, end_pos, player:get_prop("m_vecMins"), player:get_prop("m_vecMaxs"), "MASK_PLAYERSOLID & ~CONTENTS_MONSTER")
-    flags = bit.band(flags, bit.bnot(1)) 
-    if trace.fraction ~= 1.0 and trace.plane.normal.z > 0.7 then
-        flags = bit.bor(flags, 1)
+
+    trace = client.trace_hull(start, end_pos, entity.get_prop(player, "m_vecMins"), entity.get_prop(player, "m_vecMaxs"), globals.MASK_PLAYERSOLID - globals.CONTENTS_MONSTER)
+    flags = bit.band(flags, bit.bnot(globals.FL_ONGROUND))
+
+    if trace.fraction ~= 1.0 or trace.allsolid then
+        flags = bit.bor(flags, globals.FL_ONGROUND)
     end
-end
-
--- // Approach
-local function Approach(target, value, speed)
-    local diff = target - value
-    if diff > speed then
-        value = value + speed
-    elseif diff < -speed then
-        value = value - speed
-    else
-        value = target
-    end
-    return value
-end
-
-local function ApproachVector(target, value, speed)
-    local diff = target - value
-    local delta = diff:length()
-    if delta > speed then
-        value = value + diff:normalized() * speed
-    elseif delta < -speed then
-        value = value - diff:normalized() * speed
-    else
-        value = target
-    end
-    return value
-end
-
-
-local aimmatrix_transition = {}
-aimmatrix_transition.__index = aimmatrix_transition
-
-function aimmatrix_transition:new()
-    local self = setmetatable({}, aimmatrix_transition)
-    self:Init()
-    return self
-end
-
-function aimmatrix_transition:Init()
-    self.duration_state_has_been_valid = 0
-    self.duration_state_has_been_invalid = 0
-    self.how_long_to_wait_until_transition_can_blend_in = 0.3
-    self.how_long_to_wait_until_transition_can_blend_out = 0.3
-    self.blend_value = 0
-end
-
-function aimmatrix_transition:UpdateTransitionState(bStateShouldBeValid, flTimeInterval, flSpeed)
-    if bStateShouldBeValid then
-        self.duration_state_has_been_invalid = 0
-        self.duration_state_has_been_valid = self.duration_state_has_been_valid + flTimeInterval
-        if self.duration_state_has_been_valid >= self.how_long_to_wait_until_transition_can_blend_in then
-            self.blend_value = Approach(1, self.blend_value, flSpeed)
-        end
-    else
-        self.duration_state_has_been_valid = 0
-        self.duration_state_has_been_invalid = self.duration_state_has_been_invalid + flTimeInterval
-        if self.duration_state_has_been_invalid >= self.how_long_to_wait_until_transition_can_blend_out then
-            self.blend_value = Approach(0, self.blend_value, flSpeed)
-        end
-    end
-end
-
-function lagcompensation:OnRestore(e, player_record)
-    if not ui.get(enable_resolver) then return end
-    
-end
-
-function lagcompensation:SetUpAimMatrix(e)
-    if not ui.get(enable_resolver) then return end
-    local animstate = e:get_anim_state()
-    local m_flLastUpdateIncrement = 0.0 
-    local m_flSpeedAsPortionOfWalkTopSpeed = 0.0
-    local m_flSpeedAsPortionOfRunTopSpeed = 0.0
-    local m_tStandWalkAim = aimmatrix_transition:new()
-    local m_tStandRunAim = aimmatrix_transition:new()
-    local m_tCrouchWalkAim = aimmatrix_transition:new()
-    local m_flSpeedAsPortionOfCrouchTopSpeed = 0.0
-
-    if animstate.duck_amount <= 0 or animstate.duck_amount >= 1 then
-        local bPlayerIsWalking = e:get_prop("m_bIsWalking")
-        local bPlayerIsScoped = e:get_prop("m_bIsScoped")
-        local flTransitionSpeed = m_flLastUpdateIncrement * (bPlayerIsScoped and 4.2 or 0.8)
-
-        if bPlayerIsScoped then
-            m_tStandWalkAim.duration_state_has_been_invalid = m_tStandWalkAim.how_long_to_wait_until_transition_can_blend_out
-            m_tStandRunAim.duration_state_has_been_invalid = m_tStandRunAim.how_long_to_wait_until_transition_can_blend_out
-            m_tCrouchWalkAim.duration_state_has_been_invalid = m_tCrouchWalkAim.how_long_to_wait_until_transition_can_blend_out
-        end
-
-        m_tStandWalkAim:UpdateTransitionState(bPlayerIsWalking and not bPlayerIsScoped and m_flSpeedAsPortionOfWalkTopSpeed > 0.7 and m_flSpeedAsPortionOfRunTopSpeed < 0.7, m_flLastUpdateIncrement, flTransitionSpeed)
-        m_tStandRunAim:UpdateTransitionState(not bPlayerIsScoped and m_flSpeedAsPortionOfRunTopSpeed >= 0.7, m_flLastUpdateIncrement, flTransitionSpeed)
-        m_tCrouchWalkAim:UpdateTransitionState(not bPlayerIsScoped and m_flSpeedAsPortionOfCrouchTopSpeed >= 0.5, m_flLastUpdateIncrement, flTransitionSpeed)
-    end
-
-    local flStandIdleWeight = 1
-    local flStandWalkWeight = m_tStandWalkAim.blend_value
-    local flStandRunWeight = m_tStandRunAim.blend_value
-    local flCrouchIdleWeight = 1
-    local flCrouchWalkWeight = m_tCrouchWalkAim.blend_value
-
-    if flStandWalkWeight >= 1 then flStandIdleWeight = 0 end
-    if flStandRunWeight >= 1 then
-        flStandIdleWeight = 0
-        flStandWalkWeight = 0
-    end
-    if flCrouchWalkWeight >= 1 then flCrouchIdleWeight = 0 end
-    if animstate.duck_amount >= 1 then
-        flStandIdleWeight = 0
-        flStandWalkWeight = 0
-        flStandRunWeight = 0
-    elseif animstate.duck_amount <= 0 then
-        flCrouchIdleWeight = 0
-        flCrouchWalkWeight = 0
-    end
-
-    local flOneMinusDuckAmount = 1.0 - animstate.duck_amount
-    flCrouchIdleWeight = flCrouchIdleWeight * animstate.duck_amount
-    flCrouchWalkWeight = flCrouchWalkWeight * animstate.duck_amount
-    flStandWalkWeight = flStandWalkWeight * flOneMinusDuckAmount
-    flStandRunWeight = flStandRunWeight * flOneMinusDuckAmount
-
-    if flCrouchIdleWeight < 1 and flCrouchWalkWeight < 1 and flStandWalkWeight < 1 and flStandRunWeight < 1 then
-        flStandIdleWeight = 1
-    end
-    
 end
 
 function lagcompensation:setupvelocity(e, record)
-    if not ui.get(enable_resolver) then return end
-    local animstate = e:get_anim_state()
-    local animlayers = e:get_anim_layers()
-    local m_pState = animstate 
+    local velocity = entity.get_prop(e, "m_vecVelocity")
+    local speed = math.sqrt(velocity.x^2 + velocity.y^2)
+    local max_speed = 450.0
 
-    local CS_PLAYER_SPEED_RUN = 260.0
-    local m_flLastUpdateIncrement = m_pState.last_update_increment 
-    local m_flFootYaw = m_pState.goal_feet_yaw
-    local m_flMoveYaw = m_pState.current_torso_yaw
-    local m_vecVelocityNormalizedNonZero = m_pState.velocity_normalized_non_zero
-    local m_flInAirSmoothValue = m_pState.in_air_smooth_value
-    local m_AnimationData 
-    local m_szDestination = "move" 
-    local m_nMoveSequence = e:get_attachment(m_szDestination) or e:get_attachment("move")
+    if bit.band(entity.get_prop(e, "m_fFlags"), globals.FL_ONGROUND) ~= 0 then
+        local wish_dir = math.angle_forward(record.angles)
+        local wish_speed = max_speed
 
-    local m_flYaw = angle_diff((m_pState.current_torso_yaw + m_pState.goal_feet_yaw), 180.0)
-    local m_angAngle = vector(0, m_flYaw, 0)
-    local m_vecDirection = m_angAngle:to_forward() 
-
-    local m_flMovementSide = m_vecVelocityNormalizedNonZero:dot(m_vecDirection)
-    if m_flMovementSide < 0.0 then m_flMovementSide = -m_flMovementSide end
-
-    local m_flNewFeetWeight = math.angle_distance(m_flMovementSide, 0.2) * animlayers[1].weight 
-    local m_flNewFeetWeightWithAirSmooth = m_flNewFeetWeight * m_flInAirSmoothValue
-    local m_flLayer5_Weight = animlayers[5].weight
-    local m_flNewWeight = 0.55
-    if 1.0 - m_flLayer5_Weight > 0.55 then m_flNewWeight = 1.0 - m_flLayer5_Weight end
-
-    local m_flNewFeetWeightLayerWeight = m_flNewWeight * m_flNewFeetWeightWithAirSmooth
-    local m_flFeetCycleRate = 0.0
-    local m_flSpeed = math.min(e:get_prop("m_vecVelocity"):length(), 260.0)
-    animlayers[1].sequence = m_nMoveSequence
-    animlayers[1].weight = math.clamp(m_flNewFeetWeightLayerWeight, 0.0, 1.0)
-
-    if animstate.feet_speed_forwards_or_sideways >= 0.0 then
-        animstate.feet_speed_forwards_or_sideways = math.min(animstate.feet_speed_forwards_or_sideways, 1.0)
-    else
-        animstate.feet_speed_forwards_or_sideways = 0.0
-    end
-
-    local v54 = animstate.duck_amount
-    local v55 = (((animstate.some_field * -0.3) - 0.2) * animstate.feet_speed_forwards_or_sideways) + 1.0
-    if v54 > 0.0 then
-        if animstate.feet_speed_unknown_forward_or_sideways >= 0.0 then
-            animstate.feet_speed_unknown_forward_or_sideways = math.min(animstate.feet_speed_unknown_forward_or_sideways, 1.0)
-        else
-            animstate.feet_speed_unknown_forward_or_sideways = 0.0
+        if globals.config("rage_enabled") and globals.keybind_state(20) then
+            wish_speed = globals.config("rage_fakelag_limit") * max_speed / 16.0
         end
-    end
 
-    local bWasMovingLastUpdate = false
-    local bJustStartedMovingLastUpdate = false
-    if e:get_prop("m_vecVelocity"):length2d() <= 0.0 then
-        animstate.time_since_started_moving = 0.0
-        bWasMovingLastUpdate = animstate.time_since_stopped_moving <= 0.0
-        animstate.time_since_stopped_moving = animstate.time_since_stopped_moving + animstate.last_client_side_animation_update_time
-    else
-        animstate.time_since_stopped_moving = 0.0
-        bJustStartedMovingLastUpdate = animstate.time_since_started_moving <= 0.0
-        animstate.time_since_started_moving = animstate.last_client_side_animation_update_time + animstate.time_since_started_moving
-    end
+        local velocity_prop = wish_dir * wish_speed
 
-    if animstate.feet_speed_unknown_forward_or_sideways < 1.0 then
-        if animstate.feet_speed_unknown_forward_or_sideways < 0.5 then
-            local unknown_velocity = 0.0
-            local velocity = unknown_velocity
-            local delta = animstate.last_client_side_animation_update_time * 60.0
-            local new_velocity
-            if (80.0 - velocity) <= delta then
-                if (-delta) <= (80.0 - velocity) then
-                    new_velocity = 80.0
-                else
-                    new_velocity = velocity - delta
-                end
-            else
-                new_velocity = velocity + delta
-            end
-            unknown_velocity = new_velocity
-        end
+        entity.set_prop(e, "m_vecVelocity", velocity_prop.x, velocity_prop.y, velocity.z)
     end
 end
 
 function lagcompensation:animevent(e, state, order, activity)
-    if not ui.get(enable_resolver) then return end
-    local v18 = state.duck_amount > 0.55
-    local v15 = state.velocity > 0.25
-    local sequence = 0
-    local p_layer = e:get_anim_layers()[order]
-    if activity == 985 then
-        sequence = v15 and 18 or 17
-        if not v18 then
-            sequence = v15 and 16 or 15
-        end
-    elseif activity == 986 then
-        sequence = 14
-    elseif activity == 987 then
-        sequence = 13
-    elseif activity == 988 then
-        sequence = v15 and 22 or 20
-        if v18 then
-            sequence = v15 and 21 or 19
-        end
-    elseif activity == 989 then
-        sequence = 23
-        if v18 then
-            sequence = 24
-        end
-    else
-        return
+    local animlayers = entity.get_anim_overlay(e)
+    local animstate = entity.get_animation_state(e)
+    local hitbox_set = entity.get_studio_hdr(e).hitbox_set(entity.get_prop(e, "m_nHitboxSet"))
+
+    if activity == 979 then
+        animlayers[3].playback_rate = 0.0
+        animlayers[3].weight = 0.0
+        animlayers[3].cycle = 0.0
     end
 
-    p_layer.sequence = sequence
-    p_layer.weight = 0
-    p_layer.cycle = 0
+    local speed = math.sqrt(entity.get_prop(e, "m_vecVelocity").x^2 + entity.get_prop(e, "m_vecVelocity").y^2)
+
+    if activity == 981 then
+        state.time_since_in_air = 99.0
+        animlayers[5].cycle = 0.0
+    end
 end
 
 function lagcompensation:update_player_animations(e)
-    if not ui.get(enable_resolver) then return end
-    local animstate = e:get_anim_state()
-    if not animstate then return end
+    if e == nil or not entity.is_alive(e) then return end
 
-    local player_info = client.get_player_info(e:get_prop("m_iIndex"))
-    if not player_info then return end
+    local i = entity.get_ent_index(e)
+    local animlayers = entity.get_anim_overlay(e)
+    local animstate = entity.get_animation_state(e)
+    local previous_record = #player_records[i] > 1 and player_records[i][2] or nil
 
-    local records = self.player_records[e:get_prop("m_iIndex")]
-    if #records == 0 then return end
-
-    local previous_record = #records >= 2 and records[2] or nil
-    local record = records[1]
-
-    local animlayers = e:get_anim_layers()
-    record.layers = animlayers -- Copy
-
-    local backup_lower_body_yaw_target = e:get_prop("m_flLowerBodyYawTarget")
-    local backup_duck_amount = e:get_prop("m_flDuckAmount")
-    local backup_flags = e:get_prop("m_fFlags")
-    local backup_eflags = e:get_prop("m_iEFlags")
-    local backup_curtime = globals.curtime()
-    local backup_frametime = globals.frametime()
-    local backup_realtime = globals.realtime()
-    local backup_framecount = globals.framecount()
-    local backup_tickcount = globals.tickcount()
-    local backup_interpolation_amount = globals.interpolation_amount()
-
-    globals.set_curtime(e:get_prop("m_flSimulationTime"))
-    globals.set_frametime(globals.tickinterval())
-
-    local current_weapon = e:get_prop("m_hActiveWeapon")
-
-    if previous_record then
-        record.shot = record.last_shot_time > previous_record.simulation_time and record.last_shot_time <= record.simulation_time
-        local velocity = e:get_prop("m_vecVelocity")
-        local was_in_air = bit.band(e:get_prop("m_fFlags"), 1) and bit.band(previous_record.flags, 1)
-        local time_difference = math.max(globals.tickinterval(), e:get_prop("m_flSimulationTime") - previous_record.simulation_time)
-        local origin_delta = e:get_prop("m_vecOrigin") - previous_record.origin
-        local animation_speed = 0.0
-
-        if not origin_delta:is_zero() and globals.time_to_ticks(time_difference) > 0 then
-            e:set_prop("m_vecVelocity", origin_delta * (1.0 / time_difference))
-            if bit.band(e:get_prop("m_fFlags"), 1) and animlayers[11].weight > 0.0 and animlayers[11].weight < 1.0 and animlayers[11].cycle > previous_record.layers[11].cycle then
-                local weapon = e:get_prop("m_hActiveWeapon")
-                if weapon then
-                    local max_speed = 260.0
-                    local weapon_info = weapon:get_weapon_info()
-                    if weapon_info then
-                        max_speed = e:get_prop("m_bIsScoped") and weapon_info.max_player_speed_alt or weapon_info.max_player_speed
-                    end
-                    local modifier = 0.35 * (1.0 - animlayers[11].weight)
-                    if modifier > 0.0 and modifier < 1.0 then
-                        animation_speed = max_speed * (modifier + 0.55)
-                    end
-                end
-            end
-
-            if animation_speed > 0.0 then
-                animation_speed = animation_speed / e:get_prop("m_vecVelocity"):length2d()
-                local vel = e:get_prop("m_vecVelocity")
-                vel.x = vel.x * animation_speed
-                vel.y = vel.y * animation_speed
-                e:set_prop("m_vecVelocity", vel)
-            end
-
-            if #records >= 3 and time_difference > globals.tickinterval() then
-                local previous_velocity = (previous_record.origin - records[3].origin) * (1.0 / time_difference)
-                if not previous_velocity:is_zero() and not was_in_air then
-                    local current_direction = normalize_yaw(math.rad(math.atan2(e:get_prop("m_vecVelocity").y, e:get_prop("m_vecVelocity").x)))
-                    local previous_direction = normalize_yaw(math.rad(math.atan2(previous_velocity.y, previous_velocity.x)))
-                    local average_direction = current_direction - previous_direction
-                    average_direction = math.deg(normalize_yaw(current_direction + average_direction * 0.5))
-                    local direction_cos = math.cos(average_direction)
-                    local direction_sin = math.sin(average_direction)
-                    local velocity_speed = e:get_prop("m_vecVelocity"):length2d()
-                    if animlayers[6].playback_rate == 0.0 then
-                        e:set_prop("m_vecVelocity", vector(0,0,0))
-                    else
-                        local avg_speed = e:get_prop("m_vecVelocity"):length2d()
-                        if avg_speed ~= 0.0 then
-                            local weight = animlayers[11].weight
-                            local speed_as_portion = 0.55 - (weight - 1.0) * 0.35
-                            local avg_speed_modifier = speed_as_portion * (current_weapon and math.max(current_weapon:get_weapon_info().max_player_speed, 0.001) or 260.0)
-                            if weight >= 1.0 and avg_speed > avg_speed_modifier or weight < 1.0 and (avg_speed_modifier > avg_speed or weight > 0.0) then
-                                local vel = e:get_prop("m_vecVelocity")
-                                vel.x = vel.x / avg_speed
-                                vel.y = vel.y / avg_speed
-                                vel = vel * avg_speed_modifier
-                                e:set_prop("m_vecVelocity", vel * avg_speed_modifier)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        if bit.band(e:get_prop("m_fFlags"), 1) == 0 then
-            local sv_gravity = cvar.sv_gravity:get_float()
-            local tick = math.clamp(globals.time_to_ticks(time_difference), 1, 16)
-            local vel = e:get_prop("m_vecVelocity")
-            vel.z = vel.z - (sv_gravity * globals.ticks_to_time(tick) * 0.5)
-            e:set_prop("m_vecVelocity", vel)
-        else
-            local vel = e:get_prop("m_vecVelocity")
-            vel.z = 0.0
-            e:set_prop("m_vecVelocity", vel)
-        end
-    else
-        record.shot = record.last_shot_time == record.simulation_time
+    if previous_record and previous_record.invalid then
+        previous_record = nil
     end
 
-    if animlayers[6].weight == 0.0 or animlayers[6].playback_rate == 0.0 then
-        e:set_prop("m_vecVelocity", vector(0,0,0))
+    local record = player_records[i][1]
+    local old_curtime = globals.curtime()
+    local old_frametime = globals.frametime()
+    local old_rtime = globals.realtime()
+    local old_tickcount = globals.tickcount()
+    local old_ftime = globals.framecount()
+    local old_lerptime = globals.lerptime()
+    local old_tickinterval = globals.tickinterval()
+
+    local backup_lower_body_yaw_target = entity.get_prop(e, "m_flLowerBodyYawTarget")
+    local backup_duck_amount = entity.get_prop(e, "m_flDuckAmount")
+    local backup_flags = entity.get_prop(e, "m_fFlags")
+    local backup_eflags = entity.get_prop(e, "m_iEFlags")
+
+    local backup_abs_origin = entity.get_abs_origin(e)
+    local backup_abs_angles = entity.get_abs_angles(e)
+    local backup_obbs = entity.get_collideable(e)
+
+    globals.set_curtime(entity.get_prop(e, "m_flSimulationTime"))
+    globals.set_frametime(globals.interval_per_tick())
+
+    local simulation_ticks = globals.time_to_ticks(entity.get_prop(e, "m_flSimulationTime") - entity.get_prop(e, "m_flOldSimulationTime"))
+
+    if simulation_ticks < 0 or simulation_ticks > 31 then
+        simulation_ticks = 1
     end
 
-    e:set_prop("m_iEFlags", bit.band(e:get_prop("m_iEFlags"), bit.bnot(0x40))) 
+    entity.set_prop(e, "m_iEFlags", bit.band(entity.get_prop(e, "m_iEFlags"), bit.bnot(256)))
 
-    local activity = e:sequence_activity(animlayers[3].sequence)
-    if animstate.time_since_stopped_moving > 0.1 and e:get_prop("m_vecVelocity"):length2d() < 0.1 or animlayers[6].weight <= 0.1 then
-        activity = 980 
-    end
+    entity.set_abs_origin(e, record.origin)
+    entity.set_prop(e, "m_vecOrigin", record.origin.x, record.origin.y, record.origin.z)
 
-    e:set_prop("m_vecAbsVelocity", e:get_prop("m_vecVelocity"))
-    e:set_prop("m_bClientSideAnimation", true)
+    entity.set_prop(e, "m_flDuckAmount", record.duck_amount)
+    entity.set_prop(e, "m_fFlags", record.flags)
 
-    if is_dormant[e:get_prop("m_iIndex")] then
-        is_dormant[e:get_prop("m_iIndex")] = false
-        if bit.band(e:get_prop("m_fFlags"), 1) then
-            animstate.on_ground = true
-            animstate.in_hit_ground_animation = false
-        end
-        animstate.time_since_in_air = 0.0
-        animstate.goal_feet_yaw = normalize_yaw(e:get_prop("m_angEyeAngles").y)
-    end
+    entity.set_prop(e, "m_flLowerBodyYawTarget", record.lby)
+
+    entity.set_abs_angles(e, record.abs_angles)
+    entity.set_prop(e, "m_angEyeAngles", record.angles.x, record.angles.y, record.angles.z)
+
+    local layers_save = {}
+    for j=1,15 do layers_save[j] = entity.get_prop(e, "m_flLayer", j) end
+
+    entity.set_prop(e, "m_flLayer", record.layers, 15)
+
+    local state = entity.get_animation_state(e)
 
     local updated_animations = false
-    local state = {} 
-    for k,v in pairs(animstate) do state[k] = v end
-
-    local old_onground = animstate.on_ground
-    local new_onladder = not animstate.on_ground and e:get_move_type() == 9 
-    local new_onground = bit.band(e:get_prop("m_fFlags"), 1)
-    local just_landed = old_onground ~= new_onground and new_onground
-
-    if animstate.on_ground then
-        if not animstate.in_hit_ground_animation then
-            if just_landed or new_onladder then
-                local landing_activity = animstate.time_since_in_air > 1.0 and 988 or 987 
-                record.layers[5].sequence = landing_activity
-                record.layers[5].cycle = 0.0
-                animstate.in_hit_ground_animation = true
-            end
-        end
-    end
-
-    if e:get_move_type() ~= 9 then
-        if record.layers[5].weight > 0.0 then
-            local v175 = (animstate.time_since_in_air - 0.2) * -5.0
-            v175 = math.clamp(v175, 0.0, 1.0)
-            local newlayer5_weight = ((3.0 - (v175 + v175)) * (v175 * v175)) * record.layers[5].weight
-            record.layers[5].weight = newlayer5_weight
-        end
-    end
 
     if previous_record then
-        local animlayers = e:get_anim_layers()
-        e:set_anim_layers(previous_record.layers)
-        local ticks_chocked = 1
-        -- // local simulation_ticks = globals.time_to_ticks(e:get_prop("m_flSimulationTime") - previous_record.simulation_time)
-        -- // if simulation_ticks > 0 and simulation_ticks < 17 then ticks_chocked = simulation_ticks end
+        local delta = entity.get_prop(e, "m_flSimulationTime") - previous_record.simulation_time
 
-        if ticks_chocked > 1 then
+        if delta > 0.0 and delta <= 0.2 then
+            local previous_layers = previous_record.layers
+
+            local layer_count = entity.get_animlayer_count(e)
+
+            local on_ground = bit.band(record.flags, globals.FL_ONGROUND) ~= 0
+            local previous_on_ground = bit.band(previous_record.flags, globals.FL_ONGROUND) ~= 0
+
             local land_time = 0.0
             local land_in_cycle = false
             local is_landed = false
-            local on_ground = false
-            if animlayers[4].cycle < 0.5 and (bit.band(e:get_prop("m_fFlags"), 1) == 0 or bit.band(previous_record.flags, 1) == 0) then
-                land_time = e:get_prop("m_flSimulationTime") - animlayers[4].playback_rate * animlayers[4].cycle
-                land_in_cycle = land_time >= previous_record.simulation_time
+            local jump_time = 0.0
+
+            local land_layer = record.layers[5]
+            local previous_land_layer = previous_layers[5]
+
+            if land_layer.sequence ~= previous_land_layer.sequence and land_layer.weight > 0.0 and previous_land_layer.sequence > 0 and previous_land_layer.sequence < 2 then
+                land_in_cycle = true
+
+                local current_activity = entity.get_sequence_activity(e, land_layer.sequence)
+
+                if current_activity == 989 or current_activity == 987 then
+                    land_time = entity.get_prop(e, "m_flSimulationTime") - land_layer.cycle / land_layer.playback_rate
+                    jump_time = entity.get_prop(e, "m_flJumpTime")
+
+                    if jump_time == land_time or jump_time == 0.0 then
+                        on_ground = true
+                    end
+                end
             end
 
-            local duck_amount_per_tick = (e:get_prop("m_flDuckAmount") - previous_record.duck_amount) / ticks_chocked
+            entity.set_prop(e, "m_flLayer", previous_layers, 15)
 
-            for i=0, ticks_chocked-1 do
-                local simulated_time = previous_record.simulation_time + globals.ticks_to_time(i)
-                if duck_amount_per_tick then
-                    local v208 = ((record.duck_amount - e:get_prop("m_flDuckAmount")) * duck_amount_per_tick) + e:get_prop("m_flDuckAmount")
-                    e:set_prop("m_flDuckAmount", math.clamp(v208, 0.0, 1.0))
-                end
+            globals.set_curtime(previous_record.simulation_time)
+            globals.set_frametime(globals.interval_per_tick())
 
-                on_ground = bit.band(e:get_prop("m_fFlags"), 1) ~= 0
+            entity.update_clientside_animation(e)
+
+            globals.set_curtime(entity.get_prop(e, "m_flSimulationTime"))
+            globals.set_frametime(globals.interval_per_tick() * simulation_ticks)
+
+            local simulated_time = previous_record.simulation_time
+
+            for k=1,simulation_ticks do
+                simulated_time = simulated_time + globals.interval_per_tick()
+
                 if land_in_cycle and not is_landed then
                     if land_time <= simulated_time then
                         is_landed = true
                         on_ground = true
                     else
-                        on_ground = bit.band(previous_record.flags, 1) ~= 0
+                        on_ground = previous_on_ground
                     end
                 end
 
                 if on_ground then
-                    e:set_prop("m_fFlags", bit.bor(e:get_prop("m_fFlags"), 1))
+                    entity.set_prop(e, "m_fFlags", bit.bor(entity.get_prop(e, "m_fFlags"), globals.FL_ONGROUND))
                 else
-                    e:set_prop("m_fFlags", bit.band(e:get_prop("m_fFlags"), bit.bnot(1)))
+                    entity.set_prop(e, "m_fFlags", bit.band(entity.get_prop(e, "m_fFlags"), bit.bnot(globals.FL_ONGROUND)))
                 end
 
                 local simulated_ticks = globals.time_to_ticks(simulated_time)
+
                 globals.set_realtime(simulated_time)
                 globals.set_curtime(simulated_time)
                 globals.set_framecount(simulated_ticks)
                 globals.set_tickcount(simulated_ticks)
-                globals.set_interpolation_amount(0.0)
+                globals.set_lerptime(0.0)
 
-                e:update_client_animations()
+                entity.update_clientside_animation(e)
 
-                globals.set_realtime(backup_realtime)
-                globals.set_curtime(backup_curtime)
-                globals.set_framecount(backup_framecount)
-                globals.set_tickcount(backup_tickcount)
-                globals.set_interpolation_amount(backup_interpolation_amount)
-
-                updated_animations = true
+                globals.set_realtime(old_rtime)
+                globals.set_curtime(old_curtime)
+                globals.set_framecount(old_ftime)
+                globals.set_tickcount(old_tickcount)
+                globals.set_lerptime(old_lerptime)
             end
+
+            updated_animations = true
         end
     end
 
     if not updated_animations then
-        e:update_client_animations()
+        entity.update_clientside_animation(e)
     end
 
-    
-    for k,v in pairs(state) do animstate[k] = v end
+    if not entity.is_bot(e) and entity.is_alive(entity.get_local_player()) and entity.get_team_num(e) ~= entity.get_team_num(entity.get_local_player()) then
+        state.goal_feet_yaw = self.previous_goal_feet_yaw[i]
 
-    local function setup_matrix(e, layers, matrix)
-        e:invalidate_physics_recursive(8)
-        local backup_layers = e:get_anim_layers()
-        e:set_anim_layers(layers)
+        entity.update_clientside_animation(e)
 
-        if matrix == "MAIN" then
-            e:setup_bones(record.matrixes_data.main, "BONE_USED_BY_ANYTHING") -- Assume API
-        elseif matrix == "NONE" then
-            e:setup_bones(record.matrixes_data.zero, "BONE_USED_BY_HITBOX")
-        elseif matrix == "FIRST" then
-            e:setup_bones(record.matrixes_data.first, "BONE_USED_BY_HITBOX")
-        elseif matrix == "SECOND" then
-            e:setup_bones(record.matrixes_data.second, "BONE_USED_BY_HITBOX")
+        self.previous_goal_feet_yaw[i] = state.goal_feet_yaw
+
+        state.goal_feet_yaw = normalize_yaw(entity.get_prop(e, "m_angEyeAngles").y)
+
+        entity.update_clientside_animation(e)
+
+        entity.setup_bones(record.matrixes_data.zero, globals.BONE_USED_BY_HITBOX, self.player_resolver[i].resolver_layers[1])
+
+        state.goal_feet_yaw = normalize_yaw(entity.get_prop(e, "m_angEyeAngles").y + 60.0)
+
+        entity.update_clientside_animation(e)
+
+        entity.setup_bones(record.matrixes_data.first, globals.BONE_USED_BY_HITBOX, self.player_resolver[i].resolver_layers[3])
+
+        state.goal_feet_yaw = normalize_yaw(entity.get_prop(e, "m_angEyeAngles").y - 60.0)
+
+        entity.update_clientside_animation(e)
+
+        entity.setup_bones(record.matrixes_data.second, globals.BONE_USED_BY_HITBOX, self.player_resolver[i].resolver_layers[2])
+
+        state.goal_feet_yaw = normalize_yaw(entity.get_prop(e, "m_angEyeAngles").y + 35.0)
+
+        entity.update_clientside_animation(e)
+
+        entity.setup_bones(record.matrixes_data.low_first, globals.BONE_USED_BY_HITBOX)
+
+        state.goal_feet_yaw = normalize_yaw(entity.get_prop(e, "m_angEyeAngles").y - 35.0)
+
+        entity.update_clientside_animation(e)
+
+        entity.setup_bones(record.matrixes_data.low_second, globals.BONE_USED_BY_HITBOX)
+
+        self.player_resolver[i]:initialize(e, record, self.previous_goal_feet_yaw[i], entity.get_prop(e, "m_angEyeAngles").x, previous_record)
+        self.player_resolver[i]:resolve_yaw()
+
+        -- Apply resolved matrix
+        if self.player_resolver[i].player_record.side == globals.LEFT1 then
+            record.matrixes_data.main = record.matrixes_data.second
+        elseif self.player_resolver[i].player_record.side == globals.RIGHT1 then
+            record.matrixes_data.main = record.matrixes_data.first
+        elseif self.player_resolver[i].player_record.side == LOW_LEFT then
+            record.matrixes_data.main = record.matrixes_data.low_second
+        elseif self.player_resolver[i].player_record.side == LOW_RIGHT then
+            record.matrixes_data.main = record.matrixes_data.low_first
+        else
+            record.matrixes_data.main = record.matrixes_data.zero
         end
-
-        e:set_anim_layers(backup_layers)
     end
 
-    if not player_info.bot and entity.get_local_player():is_alive() and e:get_prop("m_iTeamNum") ~= entity.get_local_player():get_prop("m_iTeamNum") then
-        animstate.goal_feet_yaw = previous_goal_feet_yaw[e:get_prop("m_iIndex")]
-        e:update_client_animations()
-        previous_goal_feet_yaw[e:get_prop("m_iIndex")] = animstate.goal_feet_yaw
+    entity.update_clientside_animation(e)
 
-        for k,v in pairs(state) do animstate[k] = v end
-        animstate.goal_feet_yaw = normalize_yaw(e:get_prop("m_angEyeAngles").y)
-        e:update_client_animations()
-        setup_matrix(e, player_resolver[e:get_prop("m_iIndex")].resolver_layers[1], "NONE") -- Adjust indices
+    entity.setup_bones(record.matrixes_data.main, globals.BONE_USED_BY_ANYTHING)
 
-        for k,v in pairs(state) do animstate[k] = v end
-        animstate.goal_feet_yaw = normalize_yaw(e:get_prop("m_angEyeAngles").y + 60.0)
-        e:update_client_animations()
-        setup_matrix(e, player_resolver[e:get_prop("m_iIndex")].resolver_layers[3], "FIRST")
+    entity.set_prop(e, "m_CachedBoneData", record.matrixes_data.main, entity.cached_bone_count(e))
 
-        for k,v in pairs(state) do animstate[k] = v end
-        animstate.goal_feet_yaw = normalize_yaw(e:get_prop("m_angEyeAngles").y - 60.0)
-        e:update_client_animations()
-        setup_matrix(e, player_resolver[e:get_prop("m_iIndex")].resolver_layers[2], "SECOND")
+    globals.set_curtime(old_curtime)
+    globals.set_frametime(old_frametime)
 
-        for k,v in pairs(state) do animstate[k] = v end
+    entity.set_prop(e, "m_flLowerBodyYawTarget", backup_lower_body_yaw_target)
+    entity.set_prop(e, "m_flDuckAmount", backup_duck_amount)
+    entity.set_prop(e, "m_fFlags", backup_flags)
+    entity.set_prop(e, "m_iEFlags", backup_eflags)
 
-        player_resolver[e:get_prop("m_iIndex")]:initialize(e, record, previous_goal_feet_yaw[e:get_prop("m_iIndex")], e:get_prop("m_angEyeAngles").x, previous_record)
-    end
-
-    e:update_client_animations()
-    setup_matrix(e, animlayers, "MAIN")
-
-
-
-    globals.set_curtime(backup_curtime)
-    globals.set_frametime(backup_frametime)
-
-    e:set_prop("m_flLowerBodyYawTarget", backup_lower_body_yaw_target)
-    e:set_prop("m_flDuckAmount", backup_duck_amount)
-    e:set_prop("m_fFlags", backup_flags)
-    e:set_prop("m_iEFlags", backup_eflags)
-    e:set_anim_layers(animlayers)
-    player_resolver[e:get_prop("m_iIndex")].previous_layers = animlayers
-    player_resolver[e:get_prop("m_iIndex")].resolver_layers = animlayers
+    entity.set_prop(e, "m_flLayer", animlayers, 15)
+    entity.set_prop(e, "m_flLayer", self.player_resolver[i].previous_layers, 15)
+    entity.set_prop(e, "m_flLayer", self.player_resolver[i].resolver_layers, 15)
 
     record:store_data(e, false)
-    if e:get_prop("m_flSimulationTime") < e:get_prop("m_flOldSimulationTime") then
+
+    if entity.get_prop(e, "m_flSimulationTime") < entity.get_prop(e, "m_flOldSimulationTime") then
         record.invalid = true
     end
 end
 
 function lagcompensation:FixPvs(pCurEntity)
-    if not ui.get(enable_resolver) then return end
     if pCurEntity == entity.get_local_player() then return end
-    if not pCurEntity or not pCurEntity:is_player() or pCurEntity:get_prop("m_iIndex") == client.local_player_index() then return end
 
-    pCurEntity:set_prop("m_iOcclusionFrame", globals.framecount())
-    pCurEntity:set_prop("m_iOcclusionFlags", 0)
+    if not pCurEntity or not entity.is_player(pCurEntity) or entity.get_ent_index(pCurEntity) == entity.get_local_player_index() then return end
+
+    entity.set_prop(pCurEntity, "m_iLastRenderFrame", globals.framecount())
+    entity.set_prop(pCurEntity, "m_iLastRenderTick", 0)
 end
 
+local CSetupBones = {}
+CSetupBones.__index = CSetupBones
+
+function CSetupBones:new()
+    local obj = {}
+    setmetatable(obj, self)
+    obj.boneMatrix = nil
+    obj.vecOrigin = vector(0,0,0)
+    obj.angAngles = vector(0,0,0)
+    obj.pHdr = nil
+    obj.vecBones = {}
+    for i=1,128 do obj.vecBones[i] = vector(0,0,0) end
+    obj.quatBones = {}
+    for i=1,128 do obj.quatBones[i] = {x=0,y=0,z=0,w=0} end
+    obj.bShouldDoIK = false
+    obj.bShouldAttachment = true
+    obj.bShouldDispatch = true
+    obj.boneMask = 0
+    obj.flPoseParameters = {}
+    for i=1,24 do obj.flPoseParameters[i] = 0.0 end
+    obj.flWorldPoses = {}
+    for i=1,24 do obj.flWorldPoses[i] = 0.0 end
+    obj.nAnimOverlayCount = 0
+    obj.animLayers = {}
+    for i=1,15 do obj.animLayers[i] = {} end
+    obj.flCurtime = 0.0
+    obj.animating = nil
+    return obj
+end
+
+function CSetupBones:setup()
+    if not self.animating then return end
+
+    local hdr = self.pHdr
+    local world_hdr = hdr
+    local bone_merge = globals.get_bone_merge(self.animating)
+
+    if bone_merge then
+        local follow = globals.get_bone_merge_follow(bone_merge)
+        if follow then
+            world_hdr = entity.get_studio_hdr(follow)
+        end
+    end
+
+    local layer = {}
+    for i=1,15 do layer[i] = 0 end
+
+    local bone_setup = globals.CBoneSetup:new(hdr, self.boneMask, self.flPoseParameters)
+
+    bone_setup:InitPose(self.vecBones, self.quatBones, hdr)
+
+    if self.bShouldDoIK then
+        local ik = globals.CIKContext:new()
+        local world_ik = globals.CIKContext:new()
+
+        ik:Init(hdr, self.angAngles, self.vecOrigin, self.flCurtime, globals.framecount(), self.boneMask)
+        world_ik:Init(world_hdr, self.angAngles, self.vecOrigin, self.flCurtime, globals.framecount(), self.boneMask)
+
+        bone_setup:CalcAutoplaySequences(self.vecBones, self.quatBones, self.flCurtime, ik)
+
+        ik:UpdateTargets(self.vecBones, self.quatBones, self.boneMatrix, nil)
+        ik:SolveDependencies(self.vecBones, self.quatBones, self.boneMatrix, nil)
+
+        if bone_merge then
+            local position = {}
+            local rotation = {}
+
+            bone_setup:AccumulatePose(position, rotation, 0, 1.0, self.flCurtime, nil)
+
+            globals.bone_merge_copy_to_follow(bone_merge, position, rotation, globals.BONE_USED_BY_BONE_MERGE, self.vecBones, self.quatBones)
+
+            bone_setup:AccumulatePose(self.vecBones, self.quatBones, 0, 1.0, self.flCurtime, nil)
+        end
+
+        world_ik:UpdateTargets(position, rotation, self.boneMatrix, nil)
+        world_ik:SolveDependencies(position, rotation, self.boneMatrix, nil)
+    else
+        bone_setup:CalcAutoplaySequences(self.vecBones, self.quatBones, self.flCurtime, nil)
+    end
+
+    if bone_merge then
+        local position = {}
+        local rotation = {}
+
+        bone_setup:AccumulatePose(position, rotation, 0, 1.0, self.flCurtime, nil)
+
+        globals.bone_merge_copy_to_follow(bone_merge, position, rotation, globals.BONE_USED_BY_BONE_MERGE, self.vecBones, self.quatBones)
+    end
+
+    bone_setup:AccumulatePose(self.vecBones, self.quatBones, 0, 1.0, self.flCurtime, nil)
+
+    if self.bShouldDoIK then
+        local ik = globals.CIKContext:new()
+        local world_ik = globals.CIKContext:new()
+
+        ik:Init(hdr, self.angAngles, self.vecOrigin, self.flCurtime, 0, self.boneMask)
+        world_ik:Init(world_hdr, self.angAngles, self.vecOrigin, self.flCurtime, 0, self.boneMask)
+
+        if self.bShouldAttachment then
+            self:attachment_helper()
+        end
+
+        if bone_merge then
+            local position = {}
+            local rotation = {}
+
+            for i=1,self.nAnimOverlayCount do
+                local layer_count = self.animLayers[i]
+
+                if layer_count >= 0 and layer_count < self.nAnimOverlayCount then
+                    local final_layer = self.animLayers[i]
+                    bone_setup:AccumulatePose(position, rotation, final_layer.sequence, final_layer.cycle, final_layer.weight, self.flCurtime, world_ik)
+
+                    globals.bone_merge_copy_from_follow(bone_merge, position, rotation, globals.BONE_USED_BY_BONE_MERGE, self.vecBones, self.quatBones)
+                end
+            end
+        else
+            for i=1,self.nAnimOverlayCount do
+                local layer_count = self.animLayers[i]
+
+                if layer_count >= 0 and layer_count < self.nAnimOverlayCount then
+                    local final_layer = self.animLayers[i]
+                    bone_setup:AccumulatePose(self.vecBones, self.quatBones, final_layer.sequence, final_layer.cycle, final_layer.weight, self.flCurtime, ik)
+                end
+            end
+        end
+
+        world_ik:Destructor()
+    else
+        for i=1,self.nAnimOverlayCount do
+            local layer_count = layer[i]
+
+            if layer_count >= 0 and layer_count < self.nAnimOverlayCount then
+                local final_layer = self.animLayers[i]
+                bone_setup:AccumulatePose(self.vecBones, self.quatBones, final_layer.sequence, final_layer.cycle, final_layer.weight, self.flCurtime, nil)
+            end
+        end
+    end
+
+    if self.bShouldDoIK then
+        local world_ik = globals.CIKContext:new()
+        world_ik:Init(self.pHdr, self.angAngles, self.vecOrigin, self.flCurtime, 0, self.boneMask)
+        bone_setup:CalcAutoplaySequences(self.vecBones, self.quatBones, self.flCurtime, world_ik)
+        world_ik:Destructor()
+    else
+        bone_setup:CalcAutoplaySequences(self.vecBones, self.quatBones, self.flCurtime, nil)
+    end
+
+    bone_setup:CalcBoneAdj(self.vecBones, self.quatBones, self.flWorldPoses, self.boneMask)
+end
+
+function CSetupBones:setup_bones_server()
+    self:setup()
+end
+
+function CSetupBones:get_skeleton()
+end
+
+function CSetupBones:studio_build_matrices(hdr, worldTransform, pos, q, boneMask, out, boneComputed)
+    local i = 0
+    local chain_length = 0
+    local bone = -1
+    local studio_hdr = hdr
+
+    if bone < -1 or bone >= studio_hdr.numbones then
+        bone = 0
+    end
+
+    local bone_parent = hdr.bone_parent
+    local bone_flags = hdr.bone_flags
+
+    local chain = {}
+    for j=1,128 do chain[j] = 0 end
+
+    if bone <= -1 then
+        chain_length = studio_hdr.numbones
+
+        for k=1,studio_hdr.numbones do
+            chain[chain_length - k + 1] = k
+        end
+    else
+        i = bone
+
+        repeat
+            chain[chain_length + 1] = i
+            i = bone_parent[i + 1]
+            chain_length = chain_length + 1
+        until i == -1
+    end
+
+    local bone_matrix = {}
+
+    for j=chain_length,1,-1 do
+        i = chain[j]
+
+if bit.band(bit.lshift(1, i % 32), boneComputed[math.floor(i / 32) + 1]) ~= 0 then goto continue2 end
+        local flag = bone_flags[i + 1]
+        local parent = bone_parent[i + 1]
+
+        if bit.band(flag, boneMask) ~= 0 and q then
+            bone_matrix = math.quaternion_matrix(q[i + 1], pos[i + 1])
+
+            if parent == -1 then
+                out[i + 1] = math.concat_transforms(worldTransform, bone_matrix)
+            else
+                out[i + 1] = math.concat_transforms(out[parent + 1], bone_matrix)
+            end
+        end
+        ::continue2::
+    end
+end
+
+function CSetupBones:attachment_helper()
+    globals.attachment_helper(self.animating, self.pHdr)
+end
+
+function CSetupBones:fix_bones_rotations()
+    local studio_hdr = entity.get_studio_hdr(self.animating)
+
+    if studio_hdr then
+        local hdr = studio_hdr
+
+        if hdr then
+            local hitbox_set = hdr.hitbox_set(entity.get_prop(self.animating, "m_nHitboxSet"))
+
+            for i=1,hitbox_set.numhitboxes do
+                local hitbox = hitbox_set.hitbox(i)
+
+                if hitbox.rotation:is_zero() then goto continue3 end
+
+                local hitbox_transform = math.angle_matrix(hitbox.rotation)
+
+                self.boneMatrix[hitbox.bone + 1] = math.concat_transforms(self.boneMatrix[hitbox.bone + 1], hitbox_transform)
+                ::continue3::
+            end
+        end
+    end
+end
+
+local local_anim = local_animations:new()
+local lag_comp = lagcompensation:new()
+
+
+client.set_event_callback("net_update_end", function()
+    if not entity.get_local_player() or not ui.get(enable_resolver) then return end
+    local_anim:run(client.FRAME_NET_UPDATE_END)
+end)
+
+
+client.set_event_callback("paint", function()
+    if not entity.get_local_player() or not ui.get(enable_resolver) then return end
+    local_anim:run(client.FRAME_RENDER_START)
+end)
+
+
+client.set_event_callback("net_update_end", function()
+    if not entity.get_local_player() or not ui.get(enable_resolver) then return end
+    lag_comp:fsn(client.FRAME_NET_UPDATE_END)
+end)
+
+client.set_event_callback("aim_fire", function(e)
+    globals.fired_shots[e.target] = (globals.fired_shots[e.target] or 0) + 1
+end)
+
+client.set_event_callback("aim_miss", function(e)
+    if e.reason == "resolver" then
+        globals.missed_shots[e.target] = (globals.missed_shots[e.target] or 0) + 1
+    end
+end)
+
+client.set_event_callback("aim_hit", function(e)
+    globals.missed_shots[e.target] = 0
+end)
+
+client.set_event_callback("round_start", function()
+    for i=1,65 do
+        globals.missed_shots[i] = 0
+        globals.fired_shots[i] = 0
+    end
+end)
+
+client.set_event_callback("player_death", function(e)
+    local victim = client.userid_to_entindex(e.userid)
+    globals.missed_shots[victim] = 0
+    globals.fired_shots[victim] = 0
+end)
+
+local math = math or {}
+
+function math.clamp(val, min, max)
+    return math.max(min, math.min(max, val))
+end
+
+function math.angle_forward(angle)
+    local pitch, yaw = math.rad(angle.x), math.rad(angle.y)
+    return vector(math.cos(pitch) * math.cos(yaw), math.cos(pitch) * math.sin(yaw), -math.sin(pitch))
+end
 
 HellpineC = {
     ClanTag = {
