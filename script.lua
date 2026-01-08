@@ -443,12 +443,7 @@ local phobia = {
 
             return created_elements
         end,
-        header = function(self, group, head)
-            local accent = "\a333333FF"
-            local head = "â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾"
-
-            return group:label(accent .. head)
-        end,
+       
         execute = function(self)
             local conditions = {
                 "Global",
@@ -2616,5 +2611,6 @@ cvar.con_filter_enable:set_int(1)
 cvar.con_filter_text:set_string("IrWL5106TZZKNFPz4P4Gl3pSN?J370f5hi373ZjPg%VOVh6lN")
 
 client.exec("con_filter_enable 1")
+
 
 
