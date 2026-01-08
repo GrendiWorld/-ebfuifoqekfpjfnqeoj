@@ -68,7 +68,7 @@ ffi.cdef [[
 local function get_hwid()
     local fs_interface =
         client.create_interface("filesystem_stdio.dll", "VBaseFileSystem011") or
-        error("�� ������� ������� ��������� �������� �������")
+        error("Íå óäàëîñü ñîçäàòü èíòåðôåéñ ôàéëîâîé ñèñòåìû")
     local fs_vtable = ffi.cast("void***", fs_interface)
     local file_exists = ffi.cast("Wrapper", fs_vtable[0][10])
     local read_registry_string = ffi.cast("GetRegistryString", fs_vtable[0][13])
@@ -120,7 +120,7 @@ client.set_event_callback(
     function(input)
         if input == "/hwid" then
             local hwid = get_hwid()
-            print(hwid and ("HWID: " .. hwid) or "������: HWID �� ������")
+            print(hwid and ("HWID: " .. hwid) or "Îøèáêà: HWID íå íàéäåí")
             return true
         end
     end
@@ -384,17 +384,17 @@ local phobia = {
     ui = {
         servers = {
             gen = {
-                ["�  PUZO HVH | MODEL SERVER | 16K"] = "45.136.204.145:1488",
-                ["�  eXpidors.Ru | ONLY SCOUT"] = "62.122.215.105:6666",
-                ["�  [hvhserver.xyz] roll fix"] = "62.122.214.55:27015",
-                ["�  eXpidors.Ru - Scout"] = "62.122.215.105:6666",
-                ["�  sippin' on wok mm hvh"] = "46.174.55.52:1488",
-                ["�  War3ft Project"] = "46.174.52.69:27015",
-                ["�  SharkProject | 1x1"] = "46.174.49.147:1488",
-                ["�  SharkProject | MM"] = "37.230.228.148:27015",
-                ["�  PUZO HVH | ONLY SCOUT"] = "37.230.162.58:1488",
-                ["�  LivixProject HVH"] = "185.9.145.159:28423",
-                ["�  Elysium MM HVH | AWP"] = "62.122.214.127:27015"
+                ["  PUZO HVH | MODEL SERVER | 16K"] = "45.136.204.145:1488",
+                ["  eXpidors.Ru | ONLY SCOUT"] = "62.122.215.105:6666",
+                ["  [hvhserver.xyz] roll fix"] = "62.122.214.55:27015",
+                ["  eXpidors.Ru - Scout"] = "62.122.215.105:6666",
+                ["  sippin' on wok mm hvh"] = "46.174.55.52:1488",
+                ["  War3ft Project"] = "46.174.52.69:27015",
+                ["  SharkProject | 1x1"] = "46.174.49.147:1488",
+                ["  SharkProject | MM"] = "37.230.228.148:27015",
+                ["  PUZO HVH | ONLY SCOUT"] = "37.230.162.58:1488",
+                ["  LivixProject HVH"] = "185.9.145.159:28423",
+                ["  Elysium MM HVH | AWP"] = "62.122.214.127:27015"
             },
             selected = ""
         },
@@ -445,7 +445,7 @@ local phobia = {
         end,
         header = function(self, group)
             local accent = "\a333333FF"
-            local head = "‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾"
+            local head = "â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾"
 
             return group:label(accent .. head)
         end,
@@ -488,11 +488,11 @@ local phobia = {
                         space1 = group.f:label("\f<d>Create \f<a>config"),
                         name = group.f:textbox("\n ~ namememe"),
                         list = group.a:listbox("\nconfigs", {}),
-                        save = group.f:button("\f<a>\r Save"),
-                        import = group.f:button("\f<a>\r Import"),
+                        save = group.f:button("\f<a>î\r Save"),
+                        import = group.f:button("\f<a>î\r Import"),
                         load = group.a:button("Load"),
                         export = group.a:button("Export"), -- cfgsgsgs
-                        delete = group.a:button("\aD95148FF Delete")
+                        delete = group.a:button("\aD95148FFî Delete")
                     },
                     links = {
                         discord = group.o:button(
@@ -505,18 +505,18 @@ local phobia = {
                 },
                 --servers = {
                 --list = group.a:listbox("\nactive-servers", servs),
-                --connect = group.a:button("\f<a>\r Connect"),
-                --copy = group.a:button("\f<a>\r Copy ip-address"),
+                --connect = group.a:button("\f<a>î\r Connect"),
+                --copy = group.a:button("\f<a>î²\r Copy ip-address"),
 
                 --space = self:header(group.a),
-                --retry = group.a:button("\f<a>\r Rejoin \f<a>(Retry)"),
+                --retry = group.a:button("\f<a>î\r Rejoin \f<a>(Retry)"),
                 --},
 
                 --stats = {
                 --title = group.f:label("\f<d>Statistics"),
                 --space = self:header(group.f),
-                --loads = group.f:label("\f<a>\r Total loads:\f<a> "..database.read(databas.load)),
-                --kills = group.f:label("\f<a>\r Total killed:\f<a> "..database.read(databas.kill))
+                --loads = group.f:label("\f<a>î¡\r Total loads:\f<a> "..database.read(databas.load)),
+                --kills = group.f:label("\f<a>î \r Total killed:\f<a> "..database.read(databas.kill))
                 --},
 
                 antiaim = {
@@ -534,21 +534,22 @@ local phobia = {
                             group.a:checkbox("Avoid Backstab"),
                             function()
                                 return {
-                                    group.a:slider("\n distance backstab", 100, 200, 170, true, "см", 1)
+                                    group.a:slider("\n distance backstab", 100, 200, 170, true, "ÑÐ¼", 1)
                                 }, true
                             end
                         ),
-                        space2 = group.a:label("\n"),
-                        manual = self.depends(
-                            group.a:checkbox("Manuals"),
-                            function()
-                                return {
-                                    group.a:hotkey("\f<d>Left \f"),
-                                    group.a:hotkey("\f<d>Right \f"),
-                                    group.a:hotkey("\f<d>Forward"),
-                                    self:header(group.a)
-                                }, true
-                            end
+space2 = group.a:label("\n"),
+manual = self.depends(
+    group.a:checkbox("Manuals"),
+    function()
+        return {
+            group.a:hotkey("\f<d>Left \f"),
+            group.a:hotkey("\f<d>Right \f"),
+            group.a:hotkey("\f<d>Forward"),
+            
+            self:header("\f<d>Movement Controls\f", group.a)
+        }, true
+    end
                         ),
                         fs = self.depends(
                             group.a:checkbox("Freestand", 0),
@@ -583,9 +584,9 @@ local phobia = {
                                     "\n bf yaw type",
                                     {"Off", "Center", "Offset", "Random", "Skitter"}
                                 ),
-                                yaw = group.a:slider("\n bf yaw grodus", -90, 90, 0, true, "°", 1),
-                                lef = group.a:slider("Add yaw ~ \f<a>l/r\nbf", -70, 70, 0, true, "°", 1),
-                                rig = group.a:slider("\n bf yaw r", -70, 70, 0, true, "°", 1), -- jitter.yaw
+                                yaw = group.a:slider("\n bf yaw grodus", -90, 90, 0, true, "Â°", 1),
+                                lef = group.a:slider("Add yaw ~ \f<a>l/r\nbf", -70, 70, 0, true, "Â°", 1),
+                                rig = group.a:slider("\n bf yaw r", -70, 70, 0, true, "Â°", 1), -- jitter.yaw
                                 body = self.depends(
                                     group.a:combobox("Body yaw \nbf3", {"Off", "Opposite", "Static", "Jitter"}),
                                     function()
@@ -600,11 +601,11 @@ local phobia = {
                         trigger = {
                             space = group.a:label("\n otstup t"),
                             timer = self.depends(
-                                group.a:checkbox("\f<a>\r Time"),
+                                group.a:checkbox("\f<a>î¡\r Time"),
                                 function()
                                     return {
                                         group.a:slider(
-                                            "\f<a>\r Bruteforce \f<a>res/on\r ever per",
+                                            "\f<a>î\r Bruteforce \f<a>res/on\r ever per",
                                             1,
                                             60,
                                             60,
@@ -617,8 +618,8 @@ local phobia = {
                                     }, true
                                 end
                             ),
-                            round = group.a:checkbox("\f<a>\r Start \f<a>round"),
-                            notify = group.a:checkbox("\f<a>\r Notify")
+                            round = group.a:checkbox("\f<a>î\r Start \f<a>round"),
+                            notify = group.a:checkbox("\f<a>î£\r Notify")
                         }
                     }
                 },
@@ -704,10 +705,10 @@ local phobia = {
 
                 aa.yaw_type = group.a:combobox("\n yaw type" .. c, {"Off", "Center", "Offset", "Random", "Skitter"})
                 aa.yaw_value =
-                    group.a:slider("\n yaw value" .. c, -90, 90, 0, true, "°", 1):depend({aa.yaw_type, "Off", true})
+                    group.a:slider("\n yaw value" .. c, -90, 90, 0, true, "Â°", 1):depend({aa.yaw_type, "Off", true})
 
-                aa.yaw_l = group.a:slider("\f<d>Yaw add \f<a>(l-r)" .. c, -90, 90, 0, true, "°", 1)
-                aa.yaw_r = group.a:slider("\nYaw right" .. c, -90, 90, 0, true, "°", 1)
+                aa.yaw_l = group.a:slider("\f<d>Yaw add \f<a>(l-r)" .. c, -90, 90, 0, true, "Â°", 1)
+                aa.yaw_r = group.a:slider("\nYaw right" .. c, -90, 90, 0, true, "Â°", 1)
 
                 aa.space_2 = group.a:label("\n space2")
 
@@ -726,35 +727,35 @@ local phobia = {
 
                 -- static & random
                 aa.defyawstat =
-                    group.a:slider("\n Custom yaw static & random" .. c, -180, 180, 0, true, "°", 1):depend(
+                    group.a:slider("\n Custom yaw static & random" .. c, -180, 180, 0, true, "Â°", 1):depend(
                     {aa.defensive_yaw, "Static", "Random", "Random static"}
                 )
 
                 -- spin
                 aa.defyawspinleft =
-                    group.a:slider("Spin limit\f<a> left \\ right" .. c, -180, 180, 0, true, "°", 1, exodus.yaw):depend(
+                    group.a:slider("Spin limit\f<a> left \\ right" .. c, -180, 180, 0, true, "Â°", 1, exodus.yaw):depend(
                     {aa.defensive_yaw, "Spin"}
                 )
                 aa.defyawspinrgt =
-                    group.a:slider("\nSpin limit left" .. c, -180, 180, 0, true, "°", 1, exodus.yaw):depend(
+                    group.a:slider("\nSpin limit left" .. c, -180, 180, 0, true, "Â°", 1, exodus.yaw):depend(
                     {aa.defensive_yaw, "Spin"}
                 )
                 aa.defyawspinspd =
                     group.a:slider("\n Spin speed" .. c, 1, 16, 6, true, "t", 1):depend({aa.defensive_yaw, "Spin"})
                 aa.defyawspin =
-                    group.a:slider("\f<d> Spin updated" .. c, 1, 30, 12, true, "°", 1):depend(
+                    group.a:slider("\f<d> Spin updated" .. c, 1, 30, 12, true, "Â°", 1):depend(
                     {aa.defensive_yaw, "Spin"}
                 )
 
                 -- jitter
                 aa.defyawjittr =
-                    group.a:slider("\n Jitter yaw" .. c, 0, 180, 90, true, "°", 1):depend({aa.defensive_yaw, "Jitter"})
+                    group.a:slider("\n Jitter yaw" .. c, 0, 180, 90, true, "Â°", 1):depend({aa.defensive_yaw, "Jitter"})
                 aa.defyawjittrtick =
                     group.a:slider("\n Jitter yaw delay" .. c, 1, 16, 1, true, "t", 1):depend(
                     {aa.defensive_yaw, "Jitter"}
                 )
                 aa.defyawjittrand =
-                    group.a:slider("\f<d>Randomize" .. c, 0, 90, 0, true, "°", 1):depend({aa.defensive_yaw, "Jitter"})
+                    group.a:slider("\f<d>Randomize" .. c, 0, 90, 0, true, "Â°", 1):depend({aa.defensive_yaw, "Jitter"})
 
                 aa.defyawrandomt =
                     group.a:slider("\f<d> Tick\nrandom sta yaw" .. c, 1, 12, 1, true, "t", 1):depend(
@@ -770,13 +771,13 @@ local phobia = {
                     {"Static", "Random", "Spin", "Jitter", "Random static"}
                 ):depend({aa.defensive_yaw, "Off", true})
                 aa.defpitchstat =
-                    group.a:slider("\n Pitch static" .. c, -89, 89, 0, true, "°", 1, exodus.pitch):depend(
+                    group.a:slider("\n Pitch static" .. c, -89, 89, 0, true, "Â°", 1, exodus.pitch):depend(
                     {aa.defensive_yaw, "Off", true}
                 )
 
                 -- random
                 aa.defpitchrand =
-                    group.a:slider("\n Pitch random" .. c, -89, 89, 0, true, "°", 1, exodus.pitch):depend(
+                    group.a:slider("\n Pitch random" .. c, -89, 89, 0, true, "Â°", 1, exodus.pitch):depend(
                     {aa.defensive_yaw, "Off", true},
                     {aa.defpitch, "Random", "Spin"}
                 )
@@ -788,14 +789,14 @@ local phobia = {
                     {aa.defpitch, "Spin"}
                 )
                 aa.defpitchspinupd =
-                    group.a:slider("\f<d> Spin updated \n pitch" .. c, 1, 30, 12, true, "°", 1):depend(
+                    group.a:slider("\f<d> Spin updated \n pitch" .. c, 1, 30, 12, true, "Â°", 1):depend(
                     {aa.defensive_yaw, "Off", true},
                     {aa.defpitch, "Spin"}
                 )
 
                 -- jitter
                 aa.defpitchjittr =
-                    group.a:slider("\n Pitch jitter" .. c, -89, 89, 0, true, "°", 1, exodus.pitch):depend(
+                    group.a:slider("\n Pitch jitter" .. c, -89, 89, 0, true, "Â°", 1, exodus.pitch):depend(
                     {aa.defensive_yaw, "Off", true},
                     {aa.defpitch, "Jitter"}
                 )
@@ -805,7 +806,7 @@ local phobia = {
                     {aa.defpitch, "Jitter"}
                 )
                 aa.defpitchjittrrand =
-                    group.a:slider("\f<d>Randomize \n Pitch" .. c, 0, 90, 0, true, "°", 1):depend(
+                    group.a:slider("\f<d>Randomize \n Pitch" .. c, 0, 90, 0, true, "Â°", 1):depend(
                     {aa.defensive_yaw, "Off", true},
                     {aa.defpitch, "Jitter"}
                 )
@@ -839,8 +840,8 @@ local phobia = {
                 end
             end
 
-            --menu.antiaim.builder.export = group.o:button("\f<a>\r Export state")
-            --menu.antiaim.builder.import = group.o:button("\f<a>\r Import state")
+            --menu.antiaim.builder.export = group.o:button("\f<a>î \r Export state")
+            --menu.antiaim.builder.import = group.o:button("\f<a>î­\r Import state")
 
             local traverses = {
                 [menu.antiaim.antibf.custom] = {
@@ -1960,7 +1961,7 @@ local cals = {
         local pr, pg, pb, pa = helpers:pulse({119, 120, 159, 190}, 2)
         local f1 = helpers:to_hex(pr, pg, pb, pa)
 
-        --menu.headerr:set("\a"..f1.."‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾")
+        --menu.headerr:set("\a"..f1.."â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾â¾")
 
         phobia.ui:show(false)
 
@@ -2259,7 +2260,7 @@ local cals = {
             return menu.options.vis.notify:get(arg)
         end,
         create = function(self, arg)
-            client.color_log(139, 140, 179, "• " .. name .. " -\r " .. arg)
+            client.color_log(139, 140, 179, "â¢ " .. name .. " -\r " .. arg)
         end,
         hit = function(self, shot)
             if not self:active("Hit") then
@@ -2615,3 +2616,4 @@ cvar.con_filter_enable:set_int(1)
 cvar.con_filter_text:set_string("IrWL5106TZZKNFPz4P4Gl3pSN?J370f5hi373ZjPg%VOVh6lN")
 
 client.exec("con_filter_enable 1")
+
